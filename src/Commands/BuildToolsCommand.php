@@ -76,6 +76,8 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
      * @option team Pantheon team
      * @option pantheon-site Name of Pantheon site to create (defaults to 'target' argument)
      * @option email email address to place in ssh-key
+     * @option stability Minimum allowed stability for template project.
+     * @option existing-github Use an existing github project rather than creating a new one. DEPRECATED and TEMPORARY. This option will be removed and replaced with a separate command.
      */
     public function createProject(
         $source,
@@ -89,6 +91,8 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
             'test-site-name' => '',
             'admin-password' => '',
             'admin-email' => '',
+            'stability' => '',
+            'existing-github' => false,
         ])
     {
         // Copy options into ordinary variables
@@ -100,6 +104,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         $test_site_name = $options['test-site-name'];
         $admin_password = $options['admin-password'];
         $admin_email = $options['admin-email'];
+        $stability = $options['stability'];
 
         // If only one parameter was provided, then it is the TARGET
         if (empty($target)) {
@@ -118,7 +123,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         // If an org was provided for the target, then extract it into
         // the `$org` variable
         if (strpos($target, '/') !== FALSE) {
-            list($org, $target) = explode('/', $target, 2);
+            list($github_org, $target) = explode('/', $target, 2);
         }
 
         // If the user did not explicitly provide a Pantheon site name,
@@ -127,12 +132,6 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         // site names.
         if (empty($site_name)) {
             $site_name = $target;
-        }
-
-        // Before we begin, check to see if the requested site name is
-        // available on Pantheon, and fail if it is not.
-        if ($this->sites()->nameIsTaken($site_name)) {
-            throw new TerminusException('The site name {site_name} is already taken on Pantheon.', compact('site_name'));
         }
 
         // Provide default values for other optional variables.
@@ -156,6 +155,13 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
             $admin_email = $git_email;
         }
 
+        // Before we begin, check to see if the requested site name is
+        // available on Pantheon, and fail if it is not.
+        $site_name = strtr(strtolower($site_name), '_ ', '--');
+        if ($this->sites()->nameIsTaken($site_name)) {
+            throw new TerminusException('The site name {site_name} is already taken on Pantheon.', compact('site_name'));
+        }
+
         // We need to give Circle CI a machine token so that it can talk
         // to Pantheon. We cannot recover the token for the currently-authenticated
         // user, because security. Unfortunately, there is no API to generate
@@ -177,22 +183,28 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
             throw new TerminusException("Please generate a Circle CI personal API token token, as described in https://circleci.com/docs/api/#authentication. Then run: \n\nexport CIRCLE_TOKEN=my_personal_api_token_value");
         }
 
-        // Tell the user that we're about to create a GitHub repository
+        // This target label is only used for the log messages below.
         $target_label = $target;
         if (!empty($github_org)) {
             $target_label = "$github_org/$target";
         }
-        $this->log()->notice('Create GitHub project {target} from {src}', ['src' => $source, 'target' => $target]);
 
-        // Create the GitHub repository
-        list($target_project, $siteDir) = $this->createGitHub($source, $target, $github_org, $github_token);
+        // Clone or create the github repository
+        if ($options['existing-github']) {
+            $this->log()->notice('Use existing GitHub project {target}', ['target' => $target_label]);
+            list($target_project, $siteDir) = $this->cloneExistingGitHub($target, $github_org, $github_token);
+        }
+        else {
+            $this->log()->notice('Create GitHub project {target} from {src}', ['src' => $source, 'target' => $target_label]);
+            list($target_project, $siteDir) = $this->createGitHub($source, $target, $github_org, $github_token, $stability);
+        }
 
-        $ssh_key_email = str_replace($git_email, '@', "+ci-{$target}@");
-        $this->log()->notice('Create ssh key pair for {email}', ['email' => $ssh_key_email]);
         // Create an ssh key pair dedicated to use in these tests.
         // Change the email address to "user+ci-SITE@domain.com" so
         // that these keys can be differentiated in the Pantheon dashboard.
-        list($publicKey, $privateKey) = $this->createSshKeyPair($git_email, $site_name . '-key');
+        $ssh_key_email = str_replace('@', "+ci-{$target}@", $git_email);
+        $this->log()->notice('Create ssh key pair for {email}', ['email' => $ssh_key_email]);
+        list($publicKey, $privateKey) = $this->createSshKeyPair($ssh_key_email, $site_name . '-key');
         $this->addPublicKeyToPantheonUser($publicKey);
 
         // Look up our upstream.
@@ -209,17 +221,19 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         $this->log()->notice('Created a new Pantheon site with UUID {uuid}', ['uuid' => $site_uuid]);
 
         // Create a new README file to point to this project's Circle tests and the dev site on Pantheon
-        $badgeTargetLabel = strtr($target, '-', '_');
-        $circleBadge = "[![CircleCI](https://circleci.com/gh/$source.svg?style=svg)](https://circleci.com/gh/{$target_project})";
-        $pantheonBadge = "[![Pantheon {$target}](https://img.shields.io/badge/pantheon-{$badgeTargetLabel}-yellow.svg)](https://dashboard.pantheon.io/sites/{$site_uuid}#dev/code)";
-        $siteBadge = "[![Dev Site {$target}](https://img.shields.io/badge/site-{$badgeTargetLabel}-blue.svg)](http://dev-{$target}.pantheonsite.io/)";
-        $readme = "# $target\n\n$circleBadge $pantheonBadge $siteBadge";
-        file_put_contents("$siteDir/README.md", $readme);
+        if (!$options['existing-github']) {
+            $badgeTargetLabel = strtr($target, '-', '_');
+            $circleBadge = "[![CircleCI](https://circleci.com/gh/$source.svg?style=svg)](https://circleci.com/gh/{$target_project})";
+            $pantheonBadge = "[![Pantheon {$target}](https://img.shields.io/badge/pantheon-{$badgeTargetLabel}-yellow.svg)](https://dashboard.pantheon.io/sites/{$site_uuid}#dev/code)";
+            $siteBadge = "[![Dev Site {$target}](https://img.shields.io/badge/site-{$badgeTargetLabel}-blue.svg)](http://dev-{$target}.pantheonsite.io/)";
+            $readme = "# $target\n\n$circleBadge $pantheonBadge $siteBadge";
+            file_put_contents("$siteDir/README.md", $readme);
 
-        $this->log()->notice('Make initial commit to GitHub');
+            $this->log()->notice('Make initial commit to GitHub');
 
-        // Make the initial commit to our GitHub repository
-        $this->initialCommit($siteDir);
+            // Make the initial commit to our GitHub repository
+            $this->initialCommit($siteDir);
+        }
 
         $this->log()->notice('Push code to Pantheon');
 
@@ -300,7 +314,24 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         return [$publicKey, $privateKey];
     }
 
-    protected function createGitHub($source, $target, $github_org, $github_token)
+    protected function cloneExistingGitHub($target, $github_org, $github_token)
+    {
+        $target_org = $github_org;
+        if (empty($github_org)) {
+            $userData = $this->curlGitHub('user', [], $github_token);
+            $target_org = $userData['login'];
+        }
+        $target_project = "$target_org/$target";
+
+        $tmpsitedir = $this->tempdir('local-site');
+        $local_site_path = "$tmpsitedir/$target:dev-master";
+
+        $this->passthru("composer create-project $target_project $local_site_path -n --keep-vcs --stability dev");
+
+        return [$target_project, $local_site_path];
+    }
+
+    protected function createGitHub($source, $target, $github_org, $github_token, $stability = '')
     {
         // We need a different URL here if $github_org is an org; if no
         // org is provided, then we use a simpler URL to create a repository
@@ -310,8 +341,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         if (empty($github_org)) {
             $createRepoUrl = 'user/repos';
             $userData = $this->curlGitHub('user', [], $github_token);
-            $userLogin = $userData['login'];
-            $target_org = $userLogin;
+            $target_org = $userData['login'];
         }
         $target_project = "$target_org/$target";
         $remote_url = "git@github.com:${target_project}.git";
@@ -332,8 +362,11 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
 
         $this->log()->notice('Creating project and resolving dependencies.');
 
+        // Pass in --stability to `composer create-project` if user requested it.
+        $stability_flag = empty($stability) ? '' : "--stability $stability";
+
         // TODO: Do we need to remove $local_site_path/.git? (-n should obviate this need)
-        $this->passthru("composer create-project $source_project $local_site_path -n");
+        $this->passthru("composer create-project $source_project $local_site_path -n $stability_flag");
 
         $this->log()->notice('Creating repository {repo} from {source}', ['repo' => $remote_url, 'source' => $source_project]);
         $postData = ['name' => $target];
@@ -1233,9 +1266,6 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
      */
     public function getBuildMetadata($repositoryDir)
     {
-        $this->log()->notice('Get build metadata for {dir}', ['dir' => $repositoryDir]);
-        $this->passthru("ls -al $repositoryDir");
-
         return [
           'url'         => exec("git -C $repositoryDir config --get remote.origin.url"),
           'ref'         => exec("git -C $repositoryDir rev-parse --abbrev-ref HEAD"),
