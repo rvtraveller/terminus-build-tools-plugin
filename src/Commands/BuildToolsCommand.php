@@ -223,7 +223,8 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         // Create a new README file to point to this project's Circle tests and the dev site on Pantheon
         if (!$options['existing-github']) {
             $badgeTargetLabel = strtr($target, '-', '_');
-            $circleBadge = "[![CircleCI](https://circleci.com/gh/$source.svg?style=svg)](https://circleci.com/gh/{$target_project})";
+            $source_project = $this->sourceProjectFromSource($source);
+            $circleBadge = "[![CircleCI](https://circleci.com/gh/{$source_project}.svg?style=svg)](https://circleci.com/gh/{$target_project})";
             $pantheonBadge = "[![Pantheon {$target}](https://img.shields.io/badge/pantheon-{$badgeTargetLabel}-yellow.svg)](https://dashboard.pantheon.io/sites/{$site_uuid}#dev/code)";
             $siteBadge = "[![Dev Site {$target}](https://img.shields.io/badge/site-{$badgeTargetLabel}-blue.svg)](http://dev-{$target}.pantheonsite.io/)";
             $readme = "# $target\n\n$circleBadge $pantheonBadge $siteBadge";
@@ -346,29 +347,25 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         $target_project = "$target_org/$target";
         $remote_url = "git@github.com:${target_project}.git";
 
-        $branch = ''; // TODO: allow non-master here?
-        $version = ''; // TODO: allow version selection here? (e.g. '~2' or '^1.5')
-        $source_project = $source;
-        if (!empty($branch)) {
-            $source_project = "$source_project:dev-$branch";
-        }
-        if (!empty($version)) {
-            $source_project = "$source_project:$version";
-        }
-
+        $source_project = $this->sourceProjectFromSource($source);
         $tmpsitedir = $this->tempdir('local-site');
 
         $local_site_path = "$tmpsitedir/$target";
 
         $this->log()->notice('Creating project and resolving dependencies.');
 
+        // If the source is 'org/project:dev-branch', then automatically
+        // set the stability to 'dev'.
+        if (empty($stability) && preg_match(':dev-', $source)) {
+            $stability = 'dev';
+        }
         // Pass in --stability to `composer create-project` if user requested it.
         $stability_flag = empty($stability) ? '' : "--stability $stability";
 
         // TODO: Do we need to remove $local_site_path/.git? (-n should obviate this need)
-        $this->passthru("composer create-project $source_project $local_site_path -n $stability_flag");
+        $this->passthru("composer create-project $source $local_site_path -n $stability_flag");
 
-        $this->log()->notice('Creating repository {repo} from {source}', ['repo' => $remote_url, 'source' => $source_project]);
+        $this->log()->notice('Creating repository {repo} from {source}', ['repo' => $remote_url, 'source' => $source]);
         $postData = ['name' => $target];
         $result = $this->curlGitHub($createRepoUrl, $postData, $github_token);
         $this->log()->debug('Result of creating GitHub project is {result}', ['result' => var_export($result, true)]);
@@ -378,6 +375,17 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         $this->passthru("git -C $local_site_path remote add origin $remote_url");
 
         return [$target_project, $local_site_path];
+    }
+
+    /**
+     * Given a source, such as:
+     *    pantheon-systems/example-drops-8-composer:dev-lightning-fist-2
+     * Return the 'project' portion, including the org, e.g.:
+     *    pantheon-systems/example-drops-8-composer
+     */
+    protected function sourceProjectFromSource($source)
+    {
+        return preg_replace('/:.*//', '', $source);
     }
 
     protected function initialCommit($local_site_path)
