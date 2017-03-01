@@ -1,0 +1,29 @@
+machine:
+  timezone:
+    America/Chicago
+  php:
+    version: 7.0.11
+  environment:
+    TERMINUS_SITE: build-tools-$CIRCLE_BUILD_NUM
+    GITHUB_USERNAME: pantheon-ci-bot
+    SOURCE_COMPOSER_PROJECT: pantheon-systems/example-drops-8-composer
+
+dependencies:
+  cache_directories:
+    - ~/.composer/cache
+  pre:
+    - git config --global user.email "$GIT_EMAIL"
+    - git config --global user.name "Circle CI"
+  override:
+    - composer global require -n "hirak/prestissimo:^0.3"
+    - composer global require -n "consolidation/cgr"
+    - cgr "pantheon-systems/terminus:~1" --stability beta
+    - terminus --version
+    # Link the project directory as a Terminus plugin.
+    - ln -s $(pwd) $HOME/.terminus/plugins
+    - terminus list build-env
+  post:
+    - terminus auth:login -n --machine-token="$TERMINUS_TOKEN"
+test:
+  override:
+    - terminus build-env:create-project "$SOURCE_COMPOSER_PROJECT" "$TERMINUS_SITE"
