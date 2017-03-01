@@ -552,6 +552,53 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
     }
 
     /**
+     * Destroy a Pantheon site that was created by the build-env:create-project command.
+     *
+     * @command build-env:obliterate
+     */
+    public function obliterate($site_name)
+    {
+        $site = $this->getSite($site_name);
+
+        // Get the build metadata from the Pantheon site. Fail if there is
+        // no build metadata on the master branch of the Pantheon site.
+        $buildMetadata = $this->retrieveBuildMetadata("{$site_name}.dev");
+        if (empty($buildMetadata) || !isset($buildMetadata['url'])) {
+            throw new TerminusException('The site {site} was not created with the build-env:create-project command; it therefore cannot be deleted via build-env:obliterate.', ['site' => $site_name]);
+        }
+        $github_url = $buildMetadata['url'];
+
+        // Look up the GitHub authentication token
+        $github_token = getenv('GITHUB_TOKEN');
+
+        // Do nothing without confirmation
+        if (!$this->confirm('Are you sure you want to delete {site} AND its corresponding GitHub repository {github_url} and CircleCI configuration?', ['site' => $site->getName(), 'github_url' => $github_url])) {
+            return;
+        }
+
+        // We don't need to do anything with CircleCI; the project is
+        // automatically removed when the GitHub project is deleted.
+
+        // Use the GitHub API to delete the GitHub project.
+        $project = $this->projectFromRemoteUrl($github_url);
+        $ch = $this->createGitHubDeleteChannel("repos/$project", $github_token);
+        $data = $this->execCurlRequest($ch);
+        // $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE); // always 0
+
+        // GitHub oddity: if DELETE fails, the message is set,
+        // but 'errors' is not set. Force an error in this case.
+        if (isset($data['message'])) {
+            throw new TerminusException('GitHub error: {message}.', ['message' => $data['message']]);
+        }
+
+        $this->log()->notice('Deleted {project} from GitHub', ['project' => $project,]);
+
+        // Use the Terminus API to delete the Pantheon site.
+        $site->delete();
+        $this->log()->notice('Deleted {site} from Pantheon', ['site' => $site_name,]);
+    }
+
+    /**
      * Create the specified multidev environment on the given Pantheon
      * site from the build assets at the current working directory.
      *
@@ -976,7 +1023,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         return $branchList;
     }
 
-    protected function createGitHubCurlChannel($uri, $postData = [], $auth = '')
+    protected function createGitHubCurlChannel($uri, $auth = '')
     {
         $url = "https://api.github.com/$uri";
 
@@ -995,6 +1042,12 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         curl_setopt($ch, CURLOPT_TIMEOUT, 5);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
+        return $ch;
+    }
+
+    protected function createGitHubPostChannel($uri, $postData = [], $auth = '')
+    {
+        $ch = $this->createGitHubCurlChannel($uri, $auth);
         if (!empty($postData)) {
             $payload = json_encode($postData);
             curl_setopt($ch, CURLOPT_POST, 1);
@@ -1004,9 +1057,22 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         return $ch;
     }
 
+    protected function createGitHubDeleteChannel($uri, $auth = '')
+    {
+        $ch = $this->createGitHubCurlChannel($uri, $auth);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+
+        return $ch;
+    }
+
     public function curlGitHub($uri, $postData = [], $auth = '')
     {
-        $ch = $this->createGitHubCurlChannel($uri, $postData, $auth);
+        $ch = $this->createGitHubPostChannel($uri, $postData, $auth);
+        return $this->execCurlRequest($ch);
+    }
+
+    public function execCurlRequest($ch)
+    {
         $result = curl_exec($ch);
         if(curl_errno($ch))
         {
