@@ -403,7 +403,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
 
         // If the source is 'org/project:dev-branch', then automatically
         // set the stability to 'dev'.
-        if (empty($stability) && preg_match(':dev-', $source)) {
+        if (empty($stability) && preg_match('#:dev-#', $source)) {
             $stability = 'dev';
         }
         // Pass in --stability to `composer create-project` if user requested it.
