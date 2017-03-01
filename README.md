@@ -25,23 +25,18 @@ In order to use this plugin, you will need to set up a GitHub repository and a C
 
 ### Credentials
 
-The first thing that you need to do is set up credentials to access GitHub and Circle CI. Instructions on creating these credentials can be found on the pages listed below:
+In order to use the build-env:create-project command, the first thing that you need to do is set up credentials to access GitHub and Circle CI. Instructions on creating these credentials can be found on the pages listed below:
 
 - GitHub: https://help.github.com/articles/creating-an-access-token-for-command-line-use/
 - Circle CI: https://circleci.com/docs/api/#authentication
 
-These credentials should be exported as environment variables. For example:
+These credentials may be exported as environment variables. For example:
 ```
 #!/bin/bash
 export GITHUB_TOKEN=[REDACTED]
 export CIRCLE_TOKEN=[REDACTED]
 ```
-If you choose to store these credentials in a bash script, be sure to protect the file to avoid unintentional exposure. Consider encrypting the file. Never commit these credentials to a repository, or place them on an unsecured web server.
-
-To load these credentials:
-```
-$ source credentials.sh
-```
+If you do not export these environment variables, you will be prompted to enter them when you run the build-env:create-project command.
 
 ### Create a New Project Quickstart
 

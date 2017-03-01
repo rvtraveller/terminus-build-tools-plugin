@@ -20,6 +20,7 @@ use Symfony\Component\Finder\Finder;
 use Symfony\Component\Process\ProcessUtils;
 use Consolidation\AnnotatedCommand\AnnotationData;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * Build Tool Commands
@@ -72,6 +73,31 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         $tokens = $this->session()->getTokens();
         $token = $tokens->get($email_address);
         return $token->get('token');
+    }
+
+    /**
+     * Ensure that the user has provided credentials for GitHub and Circle CI,
+     * and prompt for them if they have not.
+     *
+     * n.b. This hook is not called in --no-interaction mode.
+     *
+     * @hook interact build-env:create-project
+     */
+    public function ensureCredentials(InputInterface $input, OutputInterface $output, AnnotationData $annotationData)
+    {
+        $github_token = getenv('GITHUB_TOKEN');
+        if (empty($github_token)) {
+            $github_token = $this->io()->ask("Please generate a GitHub personal access token token, as described in https://help.github.com/articles/creating-an-access-token-for-command-line-use/.\nThen, enter it here:");
+            $github_token = trim($github_token);
+            putenv("GITHUB_TOKEN=$github_token");
+        }
+
+        $circle_token = getenv('CIRCLE_TOKEN');
+        if (empty($circle_token)) {
+            $circle_token = $this->io()->ask("Please generate a Circle CI personal API token token, as described in https://circleci.com/docs/api/#authentication.\nThen, enter it here:");
+            $circle_token = trim($circle_token);
+            putenv("CIRCLE_TOKEN=$circle_token");
+        }
     }
 
     /**
