@@ -20,6 +20,7 @@ dependencies:
     - cgr "pantheon-systems/terminus:~1" --stability beta
     - terminus --version
     # Link the project directory as a Terminus plugin.
+    - mkdir -p $HOME/.terminus/plugins
     - ln -s $(pwd) $HOME/.terminus/plugins
     - terminus list build-env
   post:
