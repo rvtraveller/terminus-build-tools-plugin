@@ -432,7 +432,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
      */
     protected function sourceProjectFromSource($source)
     {
-        return preg_replace('/:.*//', '', $source);
+        return preg_replace('/:.*/', '', $source);
     }
 
     protected function initialCommit($local_site_path)
