@@ -54,6 +54,27 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
     }
 
     /**
+     * Recover the session's machine token.
+     */
+    protected function recoverSessionMachineToken()
+    {
+        if (!$this->session()->isActive()) {
+            return;
+        }
+
+        $user_data = $this->session()->getUser()->fetch()->serialize();
+        if (!array_key_exists('email', $user_data)) {
+            return;
+        }
+
+        $email_address = $user_data['email'];
+
+        $tokens = $this->session()->getTokens();
+        $token = $tokens->get($email_address);
+        return $token->get('token');
+    }
+
+    /**
      * Create a new project from the requested source GitHub project.
      *  - Creates a GitHub repository forked from the source project.
      *  - Creates a Pantheon site to run the tests on.
@@ -68,6 +89,8 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
      * export TERMINUS_TOKEN machine_token_from_pantheon_dashboard
      * export GITHUB_TOKEN github_personal_access_token
      * export CIRCLE_TOKEN circle_personal_api_token
+     *
+     * @authorize
      *
      * @command build-env:create-project
      * @param string $source Packagist org/name of source template project to fork.
@@ -162,17 +185,15 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
             throw new TerminusException('The site name {site_name} is already taken on Pantheon.', compact('site_name'));
         }
 
-        // We need to give Circle CI a machine token so that it can talk
-        // to Pantheon. We cannot recover the token for the currently-authenticated
-        // user, because security. Unfortunately, there is no API to generate
-        // a new machine token. Otherwise, we'd just do that, which would have
-        // the side benefit of providing a dedicated token for each site.
-        $terminus_token = getenv('TERMINUS_TOKEN');
+        // Get our authenticated credentials from environment variables.
         $github_token = getenv('GITHUB_TOKEN');
         $circle_token = getenv('CIRCLE_TOKEN');
 
+        // This command is annotated with '@authorize', so we should always be able to recover the machine token at this point.
+        $terminus_token = $this->recoverSessionMachineToken();
+
         if (empty($terminus_token)) {
-            throw new TerminusException("Please generate a Pantheon machine token, as described in https://pantheon.io/docs/machine-tokens/. Then run: \n\nexport TERMINUS_TOKEN=my_machine_token_value");
+            throw new TerminusException("Please generate a Pantheon machine token, as described in https://pantheon.io/docs/machine-tokens/. Then log in via: \n\nterminus auth:login --machine-token=my_machine_token_value");
         }
 
         if (empty($github_token)) {
