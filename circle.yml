@@ -7,6 +7,7 @@ machine:
     TERMINUS_SITE: build-tools-$CIRCLE_BUILD_NUM
     GITHUB_USERNAME: pantheon-ci-bot
     SOURCE_COMPOSER_PROJECT: pantheon-systems/example-drops-8-composer
+    PATH: $PATH:~/.composer/vendor/bin:~/.config/composer/vendor/bin
 
 dependencies:
   cache_directories:
