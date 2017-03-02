@@ -19,6 +19,7 @@ machine:
     version: 7.0.11
   environment:
     TERMINUS_SITE: build-tools-$CIRCLE_BUILD_NUM
+    TERMINUS_ORG: CI for Drupal 8 + Composer
     GITHUB_USERNAME: pantheon-ci-bot
     SOURCE_COMPOSER_PROJECT: pantheon-systems/example-drops-8-composer
     TARGET_REPO: $GITHUB_USERNAME/$TERMINUS_SITE
@@ -45,7 +46,7 @@ dependencies:
     - terminus auth:login -n --machine-token="$TERMINUS_TOKEN"
 test:
   override:
-    - terminus build-env:create-project -n "$SOURCE_COMPOSER_PROJECT" "$TERMINUS_SITE"
+    - terminus build-env:create-project -n "$SOURCE_COMPOSER_PROJECT" "$TERMINUS_SITE" --team="$TERMINUS_ORG"
     # Confirm that the Pantheon site was created
     - terminus site:info "$TERMINUS_SITE"
     # Confirm that the Github project was created

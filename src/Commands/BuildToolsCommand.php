@@ -149,10 +149,6 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         $team = $options['team'];
         $site_name = $options['pantheon-site'];
         $label = $options['label'];
-        $git_email = $options['email'];
-        $test_site_name = $options['test-site-name'];
-        $admin_password = $options['admin-password'];
-        $admin_email = $options['admin-email'];
         $stability = $options['stability'];
 
         // If only one parameter was provided, then it is the TARGET
@@ -188,20 +184,8 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
           $label = $site_name;
         }
 
-        if (empty($test_site_name)) {
-            $test_site_name = $site_name;
-        }
-
-        if (empty($admin_password)) {
-            $admin_password = mt_rand();
-        }
-
-        if (empty($git_email)) {
-            $git_email = exec('git config user.email');
-        }
-
-        if (empty($admin_email)) {
-            $admin_email = $git_email;
+        if (empty($team)) {
+            $team = getenv('TERMINUS_TEAM');
         }
 
         // Before we begin, check to see if the requested site name is
@@ -212,23 +196,8 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         }
 
         // Get our authenticated credentials from environment variables.
-        $github_token = getenv('GITHUB_TOKEN');
-        $circle_token = getenv('CIRCLE_TOKEN');
-
-        // This command is annotated with '@authorize', so we should always be able to recover the machine token at this point.
-        $terminus_token = $this->recoverSessionMachineToken();
-
-        if (empty($terminus_token)) {
-            throw new TerminusException("Please generate a Pantheon machine token, as described in https://pantheon.io/docs/machine-tokens/. Then log in via: \n\nterminus auth:login --machine-token=my_machine_token_value");
-        }
-
-        if (empty($github_token)) {
-            throw new TerminusException("Please generate a GitHub personal access token token, as described in https://help.github.com/articles/creating-an-access-token-for-command-line-use/. Then run: \n\nexport GITHUB_TOKEN=my_personal_access_token_value");
-        }
-
-        if (empty($circle_token)) {
-            throw new TerminusException("Please generate a Circle CI personal API token token, as described in https://circleci.com/docs/api/#authentication. Then run: \n\nexport CIRCLE_TOKEN=my_personal_api_token_value");
-        }
+        $github_token = $this->getRequiredGithubToken();
+        $circle_token = $this->getRequiredCircleToken();
 
         // This target label is only used for the log messages below.
         $target_label = $target;
@@ -245,14 +214,6 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
             $this->log()->notice('Create GitHub project {target} from {src}', ['src' => $source, 'target' => $target_label]);
             list($target_project, $siteDir) = $this->createGitHub($source, $target, $github_org, $github_token, $stability);
         }
-
-        // Create an ssh key pair dedicated to use in these tests.
-        // Change the email address to "user+ci-SITE@domain.com" so
-        // that these keys can be differentiated in the Pantheon dashboard.
-        $ssh_key_email = str_replace('@', "+ci-{$target}@", $git_email);
-        $this->log()->notice('Create ssh key pair for {email}', ['email' => $ssh_key_email]);
-        list($publicKey, $privateKey) = $this->createSshKeyPair($ssh_key_email, $site_name . '-key');
-        $this->addPublicKeyToPantheonUser($publicKey);
 
         // Look up our upstream.
         $upstream = $this->autodetectUpstream($siteDir);
@@ -275,6 +236,11 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
             $pantheonBadge = "[![Pantheon {$target}](https://img.shields.io/badge/pantheon-{$badgeTargetLabel}-yellow.svg)](https://dashboard.pantheon.io/sites/{$site_uuid}#dev/code)";
             $siteBadge = "[![Dev Site {$target}](https://img.shields.io/badge/site-{$badgeTargetLabel}-blue.svg)](http://dev-{$target}.pantheonsite.io/)";
             $readme = "# $target\n\n$circleBadge $pantheonBadge $siteBadge";
+
+            if (!$this->siteHasMultidevCapability($site)) {
+                $readme .= "\n\n## IMPORTANT NOTE\n\nAt the time of creation, the Pantheon site being used for testing did not have multidev capability. The test suites were therefore configured to run all tests against the dev environment. If the test site is later given multidev capabilities, you must [visit the CircleCI environment variable configuration page](https://circleci.com/gh/{$target_project}) and delete the environment variable `TERMINUS_ENV`. If you do this, then the test suite will create a new multidev environment for every pull request that is tested.";
+            }
+
             file_put_contents("$siteDir/README.md", $readme);
 
             $this->log()->notice('Make initial commit to GitHub');
@@ -290,32 +256,159 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
 
         $this->log()->notice('Install the site on the dev environment');
 
+        $circle_env = $this->getCIEnvironment($site_name, $options);
+
         // Install the site.
         $site_install_options = [
-            'account-mail' => $admin_email,
+            'account-mail' => $circle_env['ADMIN_EMAIL'],
             'account-name' => 'admin',
-            'account-pass' => $admin_password,
-            'site-mail' => $admin_email,
-            'site-name' => $test_site_name
+            'account-pass' => $circle_env['ADMIN_PASSWORD'],
+            'site-mail' => $circle_env['ADMIN_EMAIL'],
+            'site-name' => $circle_env['TEST_SITE_NAME'],
         ];
         $this->installSite("{$site_name}.dev", $siteDir, $site_install_options);
 
-        $this->log()->notice('Configure Circle CI');
+        $this->configureCircle($target_project, $circle_token, $circle_env);
+    }
+
+    protected function getRequiredGithubToken()
+    {
+        $github_token = getenv('GITHUB_TOKEN');
+        if (empty($github_token)) {
+            throw new TerminusException("Please generate a GitHub personal access token token, as described in https://help.github.com/articles/creating-an-access-token-for-command-line-use/. Then run: \n\nexport GITHUB_TOKEN=my_personal_access_token_value");
+        }
+        return $github_token;
+    }
+
+    protected function getRequiredCircleToken()
+    {
+        $circle_token = getenv('CIRCLE_TOKEN');
+        if (empty($circle_token)) {
+            throw new TerminusException("Please generate a Circle CI personal API token token, as described in https://circleci.com/docs/api/#authentication. Then run: \n\nexport CIRCLE_TOKEN=my_personal_api_token_value");
+        }
+        return $circle_token;
+    }
+
+    protected function siteHasMultidevCapability($site)
+    {
+        // Can our new site create multidevs?
+        return $site->get('max_num_cdes') > 0;
+    }
+
+    public function getCIEnvironment($site_name, $options)
+    {
+        $site = $this->getSite($site_name);
+
+        $test_site_name = $options['test-site-name'];
+        $git_email = $options['email'];
+        $admin_password = $options['admin-password'];
+        $admin_email = $options['admin-email'];
+
+        if (empty($test_site_name)) {
+            $test_site_name = $site_name;
+        }
+
+        if (empty($admin_password)) {
+            $admin_password = mt_rand();
+        }
+
+        if (empty($git_email)) {
+            $git_email = exec('git config user.email');
+        }
+
+        if (empty($admin_email)) {
+            $admin_email = $git_email;
+        }
+
+        // We should always be authenticated by the time we get here, but
+        // we will test just to be sure.
+        $terminus_token = $this->recoverSessionMachineToken();
+        if (empty($terminus_token)) {
+            throw new TerminusException("Please generate a Pantheon machine token, as described in https://pantheon.io/docs/machine-tokens/. Then log in via: \n\nterminus auth:login --machine-token=my_machine_token_value");
+        }
 
         // Set up Circle CI and run our first test.
         $circle_env = [
             'TERMINUS_TOKEN' => $terminus_token,
-            'GITHUB_TOKEN' => $github_token,
             'TERMINUS_SITE' => $site_name,
             'TEST_SITE_NAME' => $test_site_name,
             'ADMIN_PASSWORD' => $admin_password,
             'ADMIN_EMAIL' => $admin_email,
             'GIT_EMAIL' => $git_email,
         ];
+        // If this site cannot create multidev environments, then configure
+        // it to always run tests on the dev environment.
+        if (!$this->siteHasMultidevCapability($site)) {
+            $circle_env['TERMINUS_ENV'] = 'dev';
+        }
+
+        // Add the github token if available
+        $github_token = getenv('GITHUB_TOKEN');
+        if ($github_token) {
+            $circle_env['GITHUB_TOKEN'] = $github_token;
+        }
+
+        return $circle_env;
+    }
+
+    public function configureCircle($target_project, $circle_token, $circle_env)
+    {
+        $this->log()->notice('Configure Circle CI');
+
+        $site_name = $circle_env['TERMINUS_SITE'];
+        $git_email = $circle_env['GIT_EMAIL'];
+        $target_label = strtr($target_project, '/', '-');
 
         $circle_url = "https://circleci.com/api/v1.1/project/github/$target_project";
         $this->setCircleEnvironmentVars($circle_url, $circle_token, $circle_env);
+
+        // Create an ssh key pair dedicated to use in these tests.
+        // Change the email address to "user+ci-SITE@domain.com" so
+        // that these keys can be differentiated in the Pantheon dashboard.
+        $ssh_key_email = str_replace('@', "+ci-{$target_label}@", $git_email);
+        $this->log()->notice('Create ssh key pair for {email}', ['email' => $ssh_key_email]);
+        list($publicKey, $privateKey) = $this->createSshKeyPair($ssh_key_email, $site_name . '-key');
+        $this->addPublicKeyToPantheonUser($publicKey);
         $this->addPrivateKeyToCircleProject($circle_url, $circle_token, $privateKey);
+
+        // Follow the project (start a build)
+        $this->circleFollow($circle_url, $circle_token);
+    }
+
+    /**
+     * Configure CI Tests for a Pantheon site created from the specified
+     * GitHub repository
+     *
+     * @command build-env:ci:configure
+     * @param $site_name The pantheon site to test.
+     * @param $target_project The GitHub org/project to build the Pantheon site from.
+     */
+    public function configureCI(
+        $site_name,
+        $target_project,
+        $options = [
+            'test-site-name' => '',
+            'email' => '',
+            'admin-password' => '',
+            'admin-email' => '',
+        ])
+    {
+        $site = $this->getSite($site_name);
+
+        // Get the build metadata from the Pantheon site. Fail if there is
+        // no build metadata on the master branch of the Pantheon site.
+        $buildMetadata = $this->retrieveBuildMetadata("{$site_name}.dev");
+        $desired_url = "git@github.com:{$target_project}.git";
+        if (!empty($buildMetadata) && isset($buildMetadata['url']) && ($desired_url != $buildMetadata['url'])) {
+            throw new TerminusException('The site {site} is already configured to test {url}; you cannot use this site to test {desired}.', ['site' => $site_name, 'url' => $buildMetadata['url'], 'desired' => $desired_url]);
+        }
+
+        // Get our authenticated credentials from environment variables.
+        $github_token = $this->getRequiredGithubToken();
+        $circle_token = $this->getRequiredCircleToken();
+
+        $circle_env = $this->getCIEnvironment($site_name, $options);
+        $this->configureCircle($target_project, $circle_token, $circle_env);
     }
 
     /**
@@ -444,32 +537,6 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         $this->passthruRedacted("git -C $local_site_path push --progress $remote_url master", $github_token);
     }
 
-    /**
-     * For testing, show the authenticated user information
-     *
-     * @command build-env:github-user
-     *
-     * @return RowsOfFields
-     */
-    public function authenticatedUser()
-    {
-        $github_token = getenv('GITHUB_TOKEN');
-        $result = $this->curlGitHub('user', [], $github_token);
-        return $result;
-    }
-
-    /**
-     * For testing, show the user's available upstreams.
-     *
-     * @command build-env:upstreams
-     * @return RowsOfFields
-     */
-    public function showUpstreams()
-    {
-        $user = $this->session()->getUser();
-        return $user->getUpstreams()->serialize();
-    }
-
     protected function createPantheonSite($site_id, $siteDir, $label, $team, $upstream)
     {
         $this->log()->debug('Creating site {name} in org {org} with upstream {upstream}', ['name' => $site_id, 'org' => $team, 'upstream' => $upstream]);
@@ -518,38 +585,6 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         }
     }
 
-    protected function setCircleEnvironmentVars($circle_url, $token, $env)
-    {
-        foreach ($env as $key => $value) {
-            $data = ['name' => $key, 'value' => $value];
-            $this->curl($token, $data, "$circle_url/envvar");
-        }
-        $this->curl($token, [], "$circle_url/follow");
-    }
-
-    protected function addPublicKeyToPantheonUser($publicKey)
-    {
-        $this->session()->getUser()->getSSHKeys()->addKey($publicKey);
-    }
-
-    protected function addPrivateKeyToCircleProject($circle_url, $token, $privateKey)
-    {
-        $privateKeyContents = file_get_contents($privateKey);
-        $data = [
-            'hostname' => 'drush.in',
-            'private_key' => $privateKeyContents,
-        ];
-        $this->curl($token, $data, "$circle_url/ssh-key");
-    }
-
-    protected function curl($token, $data, $url)
-    {
-        $json = json_encode($data);
-
-        // TODO: Maybe use PHP curl API?
-        $this->passthru("curl -u {$token}: -X POST --header 'Content-Type: application/json' -d '$json' $url");
-    }
-
     /**
      * Destroy a Pantheon site that was created by the build-env:create-project command.
      *
@@ -568,7 +603,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         $github_url = $buildMetadata['url'];
 
         // Look up the GitHub authentication token
-        $github_token = getenv('GITHUB_TOKEN');
+        $github_token = $this->getRequiredGithubToken();
 
         // Do nothing without confirmation
         if (!$this->confirm('Are you sure you want to delete {site} AND its corresponding GitHub repository {github_url} and CircleCI configuration?', ['site' => $site->getName(), 'github_url' => $github_url])) {
@@ -581,7 +616,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         // Use the GitHub API to delete the GitHub project.
         $project = $this->projectFromRemoteUrl($github_url);
         $ch = $this->createGitHubDeleteChannel("repos/$project", $github_token);
-        $data = $this->execCurlRequest($ch);
+        $data = $this->execCurlRequest($ch, 'GitHub');
         // $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE); // always 0
 
         // GitHub oddity: if DELETE fails, the message is set,
@@ -730,7 +765,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
      * Escape one command-line arg
      *
      * @param string $arg The argument to escape
-     * @return string
+     * @return RowsOfFields
      */
     protected function escapeArgument($arg)
     {
@@ -1022,10 +1057,8 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         return $branchList;
     }
 
-    protected function createGitHubCurlChannel($uri, $auth = '')
+    protected function createAuthorizationHeaderCurlChannel($url, $auth = '')
     {
-        $url = "https://api.github.com/$uri";
-
         $headers = [
             'Content-Type: application/json',
             'User-Agent: pantheon/terminus-build-tools-plugin'
@@ -1044,14 +1077,91 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         return $ch;
     }
 
-    protected function createGitHubPostChannel($uri, $postData = [], $auth = '')
+    protected function createBasicAuthenticationCurlChannel($url, $username, $password = '')
     {
-        $ch = $this->createGitHubCurlChannel($uri, $auth);
+        $ch = $this->createAuthorizationHeaderCurlChannel($url);
+        curl_setopt($ch, CURLOPT_USERPWD, $username . ":" . $password);
+        return $ch;
+    }
+
+    protected function setCurlChannelPostData($ch, $postData)
+    {
         if (!empty($postData)) {
             $payload = json_encode($postData);
             curl_setopt($ch, CURLOPT_POST, 1);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
         }
+    }
+
+    public function execCurlRequest($ch, $service = 'API request')
+    {
+        $result = curl_exec($ch);
+        if(curl_errno($ch))
+        {
+            throw new TerminusException(curl_error($ch));
+        }
+        $data = json_decode($result, true);
+        curl_close($ch);
+
+        $errors = [];
+        if (isset($data['errors'])) {
+            foreach ($data['errors'] as $error) {
+                $errors[] = $error['message'];
+            }
+        }
+
+        if (isset($data['message']) || !empty($errors)) {
+            throw new TerminusException('{service} error: {message}. {errors}', ['service' => $service, 'message' => $data['message'], 'errors' => implode("\n", $errors)]);
+        }
+
+        return $data;
+    }
+
+    protected function setCircleEnvironmentVars($circle_url, $token, $env)
+    {
+        foreach ($env as $key => $value) {
+            $data = ['name' => $key, 'value' => $value];
+            $this->curlCircleCI($data, "$circle_url/envvar", $token);
+        }
+    }
+
+    protected function circleFollow($circle_url, $token)
+    {
+        $this->curlCircleCI([], "$circle_url/follow", $token);
+    }
+
+    protected function addPublicKeyToPantheonUser($publicKey)
+    {
+        $this->session()->getUser()->getSSHKeys()->addKey($publicKey);
+    }
+
+    protected function addPrivateKeyToCircleProject($circle_url, $token, $privateKey)
+    {
+        $privateKeyContents = file_get_contents($privateKey);
+        $data = [
+            'hostname' => 'drush.in',
+            'private_key' => $privateKeyContents,
+        ];
+        $this->curlCircleCI($data, "$circle_url/ssh-key", $token);
+    }
+
+    protected function curlCircleCI($data, $url, $auth)
+    {
+        $ch = $this->createBasicAuthenticationCurlChannel($url, $auth);
+        $this->setCurlChannelPostData($ch, $data);
+        return $this->execCurlRequest($ch, 'CircleCI');
+    }
+
+    protected function createGitHubCurlChannel($uri, $auth = '')
+    {
+        $url = "https://api.github.com/$uri";
+        return $this->createAuthorizationHeaderCurlChannel($url, $auth);
+    }
+
+    protected function createGitHubPostChannel($uri, $postData = [], $auth = '')
+    {
+        $ch = $this->createGitHubCurlChannel($uri, $auth);
+        $this->setCurlChannelPostData($ch, $postData);
 
         return $ch;
     }
@@ -1067,28 +1177,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
     public function curlGitHub($uri, $postData = [], $auth = '')
     {
         $ch = $this->createGitHubPostChannel($uri, $postData, $auth);
-        return $this->execCurlRequest($ch);
-    }
-
-    public function execCurlRequest($ch)
-    {
-        $result = curl_exec($ch);
-        if(curl_errno($ch))
-        {
-            throw new TerminusException(curl_error($ch));
-        }
-        $data = json_decode($result, true);
-        curl_close($ch);
-
-        if (isset($data['errors'])) {
-            $errors = [];
-            foreach ($data['errors'] as $error) {
-                $errors[] = $error['message'];
-            }
-            throw new TerminusException('GitHub error: {message}. {errors}', ['message' => $data['message'], 'errors' => implode("\n", $errors)]);
-        }
-
-        return $data;
+        return $this->execCurlRequest($ch, 'GitHub');
     }
 
     /**

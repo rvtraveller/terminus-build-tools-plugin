@@ -42,7 +42,7 @@ If you do not export these environment variables, you will be prompted to enter 
 
 To create a new project consisting of a GitHub project, a Pantheon site, and Circle CI tests, first set up credentials as shown in the previous section, and then run the `build-env:create-project` command as shown below:
 ```
-terminus build-env:create-project d8 example-site
+terminus build-env:create-project --team="Agency Org Name" d8 example-site
 ```
 
 This single command will:
@@ -51,6 +51,8 @@ This single command will:
 - Create a new Pantheon site built from the GitHub repository.
 - Configure CircleCI to run Behat tests on the site on every pull request.
 - Configure credentials on all of these services to allow the test scripts to run.
+
+Note that it is important to specify the name of your agency organization via the `--team` option. If you do not do this, then your new site will not have the capability to create multidev environments. In this instance, all of your tests will run on the dev environment. See [Running Tests without Multidevs](#running-tests-without-multidevs), below, for more information.
 
 In the example above, the parameter `d8` is shorthand for the project `pantheon-systems/example-drops-8-composer`, the canonical Composer-managed Drupal 8 site for Pantheon. You may replace this parameter with the GitHub organization and project name for any other canonical starter site that you would like to use.
 
@@ -93,6 +95,7 @@ To customize this for a specific project:
 For a more specific example, see:
 
 - https://github.com/pantheon-systems/example-drops-8-composer
+- https://github.com/pantheon-systems/example-drops-7-composer
 
 ### PR Environments vs Other Test Environments
 
@@ -106,6 +109,8 @@ To use this tool on a Pantheon site that does not have multidev environments sup
 ```
     TERMINUS_ENV: dev
 ```
+** IMPORTANT NOTE: ** If you initially set up your site using `terminus build-env:create-project`, and you do **not** use the `--team` option, or the team you specify is not an Agency organization, then your Circle configuration will automatically be set up to use only the dev environment. If you later add multidev capabilities to your site, you will need to [visit the Circle CI environment variables configuration page](https://circleci.com/docs/api/#authentication) and **delete** the entry for TERMINUS_ENV.
+
 ## Examples
 
 The examples below show how some of the other build-env commands are used within test scripts. It is not usually necessary to run any of these commands directly.
