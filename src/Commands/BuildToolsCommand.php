@@ -435,7 +435,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
 
     protected function initialCommit($github_token, $target_project, $local_site_path)
     {
-        $remote_url = "https://$github_token:x-oauth-basic@github.com:${target_project}.git";
+        $remote_url = "https://$github_token:x-oauth-basic@github.com/${target_project}.git";
 
         // Add the canonical repository files to the new GitHub project
         // respecting .gitignore.
