@@ -441,8 +441,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         // respecting .gitignore.
         $this->passthru("git -C $local_site_path add .");
         $this->passthru("git -C $local_site_path commit -m 'Initial commit'");
-        $this->passthru("git -C $local_site_path push $remote_url master");
-
+        $this->passthruRedacted("git -C $local_site_path push --progress $remote_url master", $github_token);
     }
 
     /**
@@ -1543,15 +1542,23 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
      *
      * @param string $command
      */
-    protected function passthru($command)
+    protected function passthru($command, $loggedCommand = '')
     {
         $result = 0;
-        $this->log()->debug("Running {cmd}", ['cmd' => $command]);
+        $this->log()->debug("Running {cmd}", ['cmd' => empty($loggedCommand) ? $command : $loggedCommand]);
         passthru($command, $result);
 
         if ($result != 0) {
             throw new TerminusException('Command `{command}` failed with exit code {status}', ['command' => $command, 'status' => $result]);
         }
+    }
+
+    function passthruRedacted($command, $secret)
+    {
+        $loggedCommand = str_replace($secret, 'REDACTED', $command);
+        $command .= " | sed -e '/$secret/REDACTED/g'";
+
+        return $this->passthru($command, $loggedCommand);
     }
 
     /**
