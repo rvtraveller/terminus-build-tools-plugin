@@ -280,7 +280,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
             $this->log()->notice('Make initial commit to GitHub');
 
             // Make the initial commit to our GitHub repository
-            $this->initialCommit($siteDir);
+            $this->initialCommit($github_token, $target_project, $siteDir);
         }
 
         $this->log()->notice('Push code to Pantheon');
@@ -392,7 +392,6 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
             $target_org = $userData['login'];
         }
         $target_project = "$target_org/$target";
-        $remote_url = "git@github.com:${target_project}.git";
 
         $source_project = $this->sourceProjectFromSource($source);
         $tmpsitedir = $this->tempdir('local-site');
@@ -412,14 +411,13 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         // TODO: Do we need to remove $local_site_path/.git? (-n should obviate this need)
         $this->passthru("composer create-project $source $local_site_path -n $stability_flag");
 
-        $this->log()->notice('Creating repository {repo} from {source}', ['repo' => $remote_url, 'source' => $source]);
+        $this->log()->notice('Creating repository {repo} from {source}', ['repo' => $target_project, 'source' => $source]);
         $postData = ['name' => $target];
         $result = $this->curlGitHub($createRepoUrl, $postData, $github_token);
         $this->log()->debug('Result of creating GitHub project is {result}', ['result' => var_export($result, true)]);
 
         // Create a GitHub repository
         $this->passthru("git -C $local_site_path init");
-        $this->passthru("git -C $local_site_path remote add origin $remote_url");
 
         return [$target_project, $local_site_path];
     }
@@ -435,13 +433,15 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         return preg_replace('/:.*/', '', $source);
     }
 
-    protected function initialCommit($local_site_path)
+    protected function initialCommit($github_token, $target_project, $local_site_path)
     {
+        $remote_url = "https://$github_token:x-oauth-basic@github.com:${target_project}.git";
+
         // Add the canonical repository files to the new GitHub project
         // respecting .gitignore.
         $this->passthru("git -C $local_site_path add .");
         $this->passthru("git -C $local_site_path commit -m 'Initial commit'");
-        $this->passthru("git -C $local_site_path push --set-upstream origin master");
+        $this->passthru("git -C $local_site_path push $remote_url master");
 
     }
 
