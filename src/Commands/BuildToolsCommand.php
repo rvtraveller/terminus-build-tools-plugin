@@ -142,7 +142,6 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
      * @option pantheon-site Name of Pantheon site to create (defaults to 'target' argument)
      * @option email email address to place in ssh-key
      * @option stability Minimum allowed stability for template project.
-     * @option existing-github Use an existing github project rather than creating a new one. DEPRECATED and TEMPORARY. This option will be removed and replaced with a separate command.
      */
     public function createProject(
         $source,
@@ -157,7 +156,6 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
             'admin-password' => '',
             'admin-email' => '',
             'stability' => '',
-            'existing-github' => false,
         ])
     {
         // Copy options into ordinary variables
@@ -221,15 +219,9 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
             $target_label = "$github_org/$target";
         }
 
-        // Clone or create the github repository
-        if ($options['existing-github']) {
-            $this->log()->notice('Use existing GitHub project {target}', ['target' => $target_label]);
-            list($target_project, $siteDir) = $this->cloneExistingGitHub($target, $github_org, $github_token);
-        }
-        else {
-            $this->log()->notice('Create GitHub project {target} from {src}', ['src' => $source, 'target' => $target_label]);
-            list($target_project, $siteDir) = $this->createGitHub($source, $target, $github_org, $github_token, $stability);
-        }
+        // Create the github repository
+        $this->log()->notice('Create GitHub project {target} from {src}', ['src' => $source, 'target' => $target_label]);
+        list($target_project, $siteDir) = $this->createGitHub($source, $target, $github_org, $github_token, $stability);
 
         // Look up our upstream.
         $upstream = $this->autodetectUpstream($siteDir);
@@ -245,25 +237,21 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         $this->log()->notice('Created a new Pantheon site with UUID {uuid}', ['uuid' => $site_uuid]);
 
         // Create a new README file to point to this project's Circle tests and the dev site on Pantheon
-        if (!$options['existing-github']) {
-            $badgeTargetLabel = strtr($target, '-', '_');
-            $source_project = $this->sourceProjectFromSource($source);
-            $circleBadge = "[![CircleCI](https://circleci.com/gh/{$source_project}.svg?style=svg)](https://circleci.com/gh/{$target_project})";
-            $pantheonBadge = "[![Pantheon {$target}](https://img.shields.io/badge/pantheon-{$badgeTargetLabel}-yellow.svg)](https://dashboard.pantheon.io/sites/{$site_uuid}#dev/code)";
-            $siteBadge = "[![Dev Site {$target}](https://img.shields.io/badge/site-{$badgeTargetLabel}-blue.svg)](http://dev-{$target}.pantheonsite.io/)";
-            $readme = "# $target\n\n$circleBadge $pantheonBadge $siteBadge";
+        $badgeTargetLabel = strtr($target, '-', '_');
+        $circleBadge = "[![CircleCI](https://circleci.com/gh/{$target_project}.svg?style=svg)](https://circleci.com/gh/{$target_project})";
+        $pantheonBadge = "[![Pantheon {$target}](https://img.shields.io/badge/pantheon-{$badgeTargetLabel}-yellow.svg)](https://dashboard.pantheon.io/sites/{$site_uuid}#dev/code)";
+        $siteBadge = "[![Dev Site {$target}](https://img.shields.io/badge/site-{$badgeTargetLabel}-blue.svg)](http://dev-{$target}.pantheonsite.io/)";
+        $readme = "# $target\n\n$circleBadge\n$pantheonBadge\n$siteBadge";
 
-            if (!$this->siteHasMultidevCapability($site)) {
-                $readme .= "\n\n## IMPORTANT NOTE\n\nAt the time of creation, the Pantheon site being used for testing did not have multidev capability. The test suites were therefore configured to run all tests against the dev environment. If the test site is later given multidev capabilities, you must [visit the CircleCI environment variable configuration page](https://circleci.com/gh/{$target_project}) and delete the environment variable `TERMINUS_ENV`. If you do this, then the test suite will create a new multidev environment for every pull request that is tested.";
-            }
-
-            file_put_contents("$siteDir/README.md", $readme);
-
-            $this->log()->notice('Make initial commit to GitHub');
-
-            // Make the initial commit to our GitHub repository
-            $this->initialCommit($github_token, $target_project, $siteDir);
+        if (!$this->siteHasMultidevCapability($site)) {
+            $readme .= "\n\n## IMPORTANT NOTE\n\nAt the time of creation, the Pantheon site being used for testing did not have multidev capability. The test suites were therefore configured to run all tests against the dev environment. If the test site is later given multidev capabilities, you must [visit the CircleCI environment variable configuration page](https://circleci.com/gh/{$target_project}) and delete the environment variable `TERMINUS_ENV`. If you do this, then the test suite will create a new multidev environment for every pull request that is tested.";
         }
+
+        file_put_contents("$siteDir/README.md", $readme);
+
+        // Make the initial commit to our GitHub repository
+        $this->log()->notice('Make initial commit to GitHub');
+        $this->initialCommit($github_token, $target_project, $siteDir);
 
         $this->log()->notice('Push code to Pantheon');
 
