@@ -624,8 +624,8 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
 
         // Get the build metadata from the Pantheon site. Fail if there is
         // no build metadata on the master branch of the Pantheon site.
-        $buildMetadata = $this->retrieveBuildMetadata("{$site_name}.dev");
-        if (empty($buildMetadata) || !isset($buildMetadata['url'])) {
+        $buildMetadata = $this->retrieveBuildMetadata("{$site_name}.dev") + ['url' => ''];
+        if (empty($buildMetadata['url'])) {
             throw new TerminusException('The site {site} was not created with the build-env:create-project command; it therefore cannot be deleted via build-env:obliterate.', ['site' => $site_name]);
         }
         $github_url = $buildMetadata['url'];
