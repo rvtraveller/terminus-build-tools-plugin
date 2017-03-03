@@ -308,7 +308,8 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
     protected function siteHasMultidevCapability($site)
     {
         // Can our new site create multidevs?
-        return $site->get('max_num_cdes') > 0;
+        // TODO: For some reason, this field is not being populated in some instances.
+        return true; // $site->get('max_num_cdes') > 0;
     }
 
     public function getCIEnvironment($site_name, $options)
@@ -415,9 +416,9 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
 
         // Get the build metadata from the Pantheon site. Fail if there is
         // no build metadata on the master branch of the Pantheon site.
-        $buildMetadata = $this->retrieveBuildMetadata("{$site_name}.dev");
+        $buildMetadata = $this->retrieveBuildMetadata("{$site_name}.dev") + ['url' => ''];
         $desired_url = "git@github.com:{$target_project}.git";
-        if (!empty($buildMetadata) && isset($buildMetadata['url']) && ($desired_url != $buildMetadata['url'])) {
+        if (!empty($buildMetadata['url']) && ($desired_url != $buildMetadata['url'])) {
             throw new TerminusException('The site {site} is already configured to test {url}; you cannot use this site to test {desired}.', ['site' => $site_name, 'url' => $buildMetadata['url'], 'desired' => $desired_url]);
         }
 
@@ -637,6 +638,8 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
             return;
         }
 
+        $this->log()->notice('About to delete {site} and its corresponding GitHub repository {github_url} and CircleCI configuration.', ['site' => $site->getName(), 'github_url' => $github_url]);
+
         // We don't need to do anything with CircleCI; the project is
         // automatically removed when the GitHub project is deleted.
 
@@ -644,7 +647,6 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         $project = $this->projectFromRemoteUrl($github_url);
         $ch = $this->createGitHubDeleteChannel("repos/$project", $github_token);
         $data = $this->execCurlRequest($ch, 'GitHub');
-        // $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE); // always 0
 
         // GitHub oddity: if DELETE fails, the message is set,
         // but 'errors' is not set. Force an error in this case.
@@ -1113,9 +1115,9 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         return $ch;
     }
 
-    protected function setCurlChannelPostData($ch, $postData)
+    protected function setCurlChannelPostData($ch, $postData, $force = false)
     {
-        if (!empty($postData)) {
+        if (!empty($postData) || $force) {
             $payload = json_encode($postData);
             curl_setopt($ch, CURLOPT_POST, 1);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
@@ -1130,6 +1132,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
             throw new TerminusException(curl_error($ch));
         }
         $data = json_decode($result, true);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
         $errors = [];
@@ -1138,9 +1141,14 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
                 $errors[] = $error['message'];
             }
         }
+        if ($httpCode && ($httpCode >= 300)) {
+            $errors[] = "Http status code: $httpCode";
+        }
 
-        if (isset($data['message']) || !empty($errors)) {
-            throw new TerminusException('{service} error: {message}. {errors}', ['service' => $service, 'message' => $data['message'], 'errors' => implode("\n", $errors)]);
+        $message = isset($data['message']) ? "{$data['message']}." : '';
+
+        if (!empty($message) || !empty($errors)) {
+            throw new TerminusException('{service} error: {message} {errors}', ['service' => $service, 'message' => $message, 'errors' => implode("\n", $errors)]);
         }
 
         return $data;
@@ -1178,7 +1186,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
     {
         $this->log()->notice('Call CircleCI API: {uri}', ['uri' => $url]);
         $ch = $this->createBasicAuthenticationCurlChannel($url, $auth);
-        $this->setCurlChannelPostData($ch, $data);
+        $this->setCurlChannelPostData($ch, $data, true);
         return $this->execCurlRequest($ch, 'CircleCI');
     }
 
