@@ -52,7 +52,7 @@ test:
     # Confirm that the Github project was created
     - git clone "https://github.com/${TARGET_REPO}.git" "$TARGET_REPO_WORKING_COPY"
     # Confirm that Circle was configured for testing, and that the first test passed
-    - circle token "$CIRCLE_TOKEN" --repo="$TARGET_REPO_WORKING_COPY" && circle watch --repo="$TARGET_REPO_WORKING_COPY"
+    - cd "$TARGET_REPO_WORKING_COPY" && circle token "$CIRCLE_TOKEN" && circle watch
   post:
     # Delete the Pantheon site, the Github project, and the Circle configuration
     - terminus build-env:obliterate -n "$TERMINUS_SITE"
