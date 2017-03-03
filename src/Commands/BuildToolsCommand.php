@@ -60,19 +60,35 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
     protected function recoverSessionMachineToken()
     {
         if (!$this->session()->isActive()) {
+            $this->log()->notice('No active session.');
             return;
         }
 
         $user_data = $this->session()->getUser()->fetch()->serialize();
         if (!array_key_exists('email', $user_data)) {
+            $this->log()->notice('No email address in active session data.');
             return;
         }
 
+        // Look up the email address of the active user (as auth:whoami does).
         $email_address = $user_data['email'];
 
+        // Try to look up the machine token using the Terminus API.
         $tokens = $this->session()->getTokens();
         $token = $tokens->get($email_address);
-        return $token->get('token');
+        $machine_token = $token->get('token');
+
+        // If we can't get the machine token through regular Terminus API,
+        // then serialize all of the tokens and see if we can find it there.
+        // This is a workaround for a Terminus bug.
+        if (empty($machine_token)) {
+            $raw_data = $tokens->serialize();
+            if (isset($raw_data[$email_address]['token'])) {
+                $machine_token = $raw_data[$email_address]['token'];
+            }
+        }
+
+        return $machine_token;
     }
 
     /**
@@ -157,7 +173,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
             $source = 'pantheon-systems/example-drops-8-composer';
         }
 
-        // If someone provided a common alias, then replace it with its expanded value
+        // If the source site is a common alias, then replace it with its expanded value
         $source = $this->expandSourceAliases($source);
 
         // If an org was not provided for the source, then assume pantheon-systems
@@ -379,6 +395,8 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
      * Configure CI Tests for a Pantheon site created from the specified
      * GitHub repository
      *
+     * @authorize
+     *
      * @command build-env:ci:configure
      * @param $site_name The pantheon site to test.
      * @param $target_project The GitHub org/project to build the Pantheon site from.
@@ -416,9 +434,18 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
      */
     protected function expandSourceAliases($source)
     {
+        //
+        // key:   org/project of template repository
+        // value: list of aliases
+        //
+        // If the org is missing from the template repository, then
+        // pantheon-systems is assumed.
+        //
         $aliases = [
             'example-drops-8-composer' => ['d8', 'drops-8'],
             'example-drops-7-composer' => ['d7', 'drops-7'],
+
+            // The wordpress template has not been created yet
             // 'example-wordpress-composer' => ['wp', 'wordpress'],
         ];
 
@@ -507,7 +534,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         $this->log()->notice('Creating repository {repo} from {source}', ['repo' => $target_project, 'source' => $source]);
         $postData = ['name' => $target];
         $result = $this->curlGitHub($createRepoUrl, $postData, $github_token);
-        $this->log()->debug('Result of creating GitHub project is {result}', ['result' => var_export($result, true)]);
+        $this->log()->notice('Result of creating GitHub project is {result}', ['result' => var_export($result, true)]);
 
         // Create a GitHub repository
         $this->passthru("git -C $local_site_path init");
@@ -539,7 +566,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
 
     protected function createPantheonSite($site_id, $siteDir, $label, $team, $upstream)
     {
-        $this->log()->debug('Creating site {name} in org {org} with upstream {upstream}', ['name' => $site_id, 'org' => $team, 'upstream' => $upstream]);
+        $this->log()->notice('Creating site {name} in org {org} with upstream {upstream}', ['name' => $site_id, 'org' => $team, 'upstream' => $upstream]);
         $this->siteCreate($site_id, $label, $upstream, ['org' => $team]);
     }
 
@@ -752,7 +779,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
                 $command_line .= " --$option=" . $this->escapeArgument($value);
             }
         }
-        $this->log()->notice("Install site via {cmd}", ['cmd' => $command_line]);
+        $this->log()->notice("Install site via {cmd}", ['cmd' => str_replace($site_install_options['account-pass'], 'REDACTED', $command_line)]);
         $result = $env->sendCommandViaSsh(
             $command_line,
             function ($type, $buffer) {
@@ -809,6 +836,8 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         if (!empty($label)) {
             $env_label = $label;
         }
+
+        $this->log()->notice('Pushing code to {multidev} using branch {branch}.', ['multidev' => $multidev, $branch]);
 
         // Fetch the site id also
         $siteInfo = $site->serialize();
@@ -1147,6 +1176,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
 
     protected function curlCircleCI($data, $url, $auth)
     {
+        $this->log()->notice('Call CircleCI API: {uri}', ['uri' => $url]);
         $ch = $this->createBasicAuthenticationCurlChannel($url, $auth);
         $this->setCurlChannelPostData($ch, $data);
         return $this->execCurlRequest($ch, 'CircleCI');
@@ -1176,6 +1206,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
 
     public function curlGitHub($uri, $postData = [], $auth = '')
     {
+        $this->log()->notice('Call GitHub API: {uri}', ['uri' => $uri]);
         $ch = $this->createGitHubPostChannel($uri, $postData, $auth);
         return $this->execCurlRequest($ch, 'GitHub');
     }
@@ -1610,7 +1641,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         $src = preg_replace('/^:/', $siteAddress, $src);
         $dest = preg_replace('/^:/', $siteAddress, $dest);
 
-        $this->log()->debug('Rsync {src} => {dest}', ['src' => $src, 'dest' => $dest]);
+        $this->log()->notice('Rsync {src} => {dest}', ['src' => $src, 'dest' => $dest]);
         passthru("rsync -rlIvz --ipv4 --exclude=.git -e 'ssh -p 2222' $src $dest >/dev/null 2>&1", $status);
 
         return $status;
@@ -1634,18 +1665,20 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
     protected function passthru($command, $loggedCommand = '')
     {
         $result = 0;
-        $this->log()->debug("Running {cmd}", ['cmd' => empty($loggedCommand) ? $command : $loggedCommand]);
+        $loggedCommand = empty($loggedCommand) ? $command : $loggedCommand;
+        // TODO: How noisy do we want to be?
+        $this->log()->notice("Running {cmd}", ['cmd' => $loggedCommand]);
         passthru($command, $result);
 
         if ($result != 0) {
-            throw new TerminusException('Command `{command}` failed with exit code {status}', ['command' => $command, 'status' => $result]);
+            throw new TerminusException('Command `{command}` failed with exit code {status}', ['command' => $loggedCommand, 'status' => $result]);
         }
     }
 
     function passthruRedacted($command, $secret)
     {
         $loggedCommand = str_replace($secret, 'REDACTED', $command);
-        $command .= " | sed -e '/$secret/REDACTED/g'";
+        $command .= " | sed -e 's/$secret/REDACTED/g'";
 
         return $this->passthru($command, $loggedCommand);
     }
@@ -1659,7 +1692,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
     protected function exec($command)
     {
         $result = 0;
-        $this->log()->debug("Running {cmd}", ['cmd' => $command]);
+        $this->log()->notice("Running {cmd}", ['cmd' => $command]);
         exec($command, $outputLines, $result);
 
         if ($result != 0) {
