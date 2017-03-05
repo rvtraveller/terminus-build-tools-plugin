@@ -250,7 +250,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
     {
         // Look up the oldest environments matching the delete pattern
         $oldestEnvironments = $this->oldestEnvironments($site_id, $multidev_delete_pattern);
-
+var_dump($oldestEnvironments);
         // Stop if nothing matched
         if (empty($oldestEnvironments)) {
             $this->log()->notice('No environments matched the provided pattern "{pattern}".', ['pattern' => $multidev_delete_pattern]);
@@ -574,7 +574,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
                 return ($a['created'] < $b['created']) ? -1 : 1;
             }
         );
-
+var_dump($env_list);
         return $env_list;
     }
 
