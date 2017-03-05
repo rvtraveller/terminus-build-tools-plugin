@@ -724,6 +724,10 @@ var_dump($env_list);
         $src = ':code/build-metadata.json';
         $dest = '/tmp/build-metadata.json';
 
+var_dump("RETRIEVE METADATA");
+var_dump($site_env_id);
+var_dump($src);
+var_dump($dest);
         $status = $this->rsync($site_env_id, $src, $dest);
         if ($status != 0) {
             return [];
@@ -785,12 +789,13 @@ var_dump($env_list);
         $site_id = $siteInfo['id'];
 
         $siteAddress = "$env_id.$site_id@appserver.$env_id.$site_id.drush.in:";
-
+var_dump("RSYNC");
+var_dump($siteAddress);
         $src = preg_replace('/^:/', $siteAddress, $src);
         $dest = preg_replace('/^:/', $siteAddress, $dest);
 
         passthru("rsync -rlIvz --ipv4 --exclude=.git -e 'ssh -p 2222' $src $dest >/dev/null 2>&1", $status);
-
+var_dump($status);
         return $status;
     }
 
