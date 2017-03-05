@@ -266,7 +266,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         );
 
         // Find the URL to the remote origin
-        $remoteUrlFromGit = exec('git config --get remote.origin.url');
+        $remoteUrlFromGit = $this->getGitRemoteOriginUrl();
 
         // Find the URL of the remote origin stored in the build metadata
         $remoteUrl = $this->retrieveRemoteUrlFromBuildMetadata($site_id, $oldestEnvironments);
@@ -667,13 +667,27 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
     public function getBuildMetadata()
     {
         return [
-          'url'         => exec('git config --get remote.origin.url'),
+          'url'         => $this->getGitRemoteOriginUrl(),
           'ref'         => exec('git rev-parse --abbrev-ref HEAD'),
           'sha'         => exec('git rev-parse HEAD'),
           'comment'     => exec('git log --pretty=format:%s -1'),
           'commit-date' => exec('git show -s --format=%ci HEAD'),
           'build-date'  => date('Y-m-d H:i:s O'),
         ];
+    }
+
+    /**
+     * Gets the git remote URL.
+     *
+     * @return string
+     */
+    public function getGitRemoteOriginUrl() {
+        $ciToken = getenv('CI_BUILD_TOKEN');
+        $remoteUrl = exec('git config --get remote.origin.url');
+        if ($ciToken) {
+            $remoteUrl = str_replace($ciToken, "XXXXXX", $remoteUrl);
+        }
+        return $remoteUrl;
     }
 
     /**
