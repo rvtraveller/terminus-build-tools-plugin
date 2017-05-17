@@ -183,7 +183,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
           throw new TerminusException('The git provider {git_provider} is not currently supported.', compact('git_provider'));
         }
 
-        if (!in_array(strtolower($ci_provider), ['circleci'])) {
+        if (!in_array(strtolower($ci_provider), ['circleci', 'gitlabci'])) {
           throw new TerminusException('The CI provider {ci_provider} is not currently supported.', compact('ci_provider'));
         }
 
