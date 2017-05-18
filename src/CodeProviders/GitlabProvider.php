@@ -37,7 +37,7 @@ class GitlabProvider extends GitProvider {
   /**
    * {@inheritdoc}
    */
-  public function create($source, $target, $git_org, $git_token, $stability) {
+  public function create($source, $target, $git_org, $git_token, $stability, $site_name) {
     // We need a different URL here if $git_org is an org; if no
     // org is provided, then we use a simpler URL to create a repository
     // owned by the currently-authenitcated user.
@@ -70,6 +70,16 @@ class GitlabProvider extends GitProvider {
       'namespace_id' => 141,
     ];
     $result = $this->curl($createRepoUrl, $postData, $git_token);
+
+    $variables = [
+      'TERMINUS_TOKEN' => getenv('PANTHEON_MACHINE_TOKEN'),
+      'SSH_PRIVATE_KEY' => getenv('SSH_PRIVATE_KEY'),
+      'TERMINUS_SITE' => $site_name,
+    ];
+
+    foreach ($variables as $key => $variable) {
+      $this->setCIVariable(urlencode($target_project), $key, $variable);
+    }
 
     // Create a git repository. Add an origin just to have the data there
     // when collecting the build metadata later. We use the 'pantheon'
@@ -147,6 +157,15 @@ class GitlabProvider extends GitProvider {
   {
     $url = "https://git.mindgrub.net/$uri";
     return $this->createGitlabAuthorizationHeaderCurlChannel($url, $auth);
+  }
+
+  protected function setCIVariable($id, $key, $variable, $git_token) {
+    $path = 'api/v4/projects/' . $id . '/variables';
+    $postData = [
+      'key' => $key,
+      'value' => $variable,
+    ];
+    $this->curl($path, $postData, $git_token);
   }
 
   protected function createGitlabPostChannel($uri, $postData = [], $auth = '')

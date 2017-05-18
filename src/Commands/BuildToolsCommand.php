@@ -328,7 +328,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
 
         // Create the github repository
         $this->log()->notice('Create Git project {target} from {src}', ['src' => $source, 'target' => $target_label]);
-        list($target_project, $siteDir) = $git_provider->create($source, $target, $git_org, $git_token, $stability);
+        list($target_project, $siteDir) = $git_provider->create($source, $target, $git_org, $git_token, $stability, $site_name);
 
         $site = null;
         try {
@@ -1079,7 +1079,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
 
         // Push the branch to Pantheon
         $preCommitTime = time();
-        $this->passthru("git -C $repositoryDir push --force -q pantheon $branch");
+        $this->passthru("git -C $repositoryDir push --force --verbose pantheon $branch");
 
         // If the environment already existed, then we risk encountering
         // a race condition, because the 'git push' above will fire off
