@@ -1133,7 +1133,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         $this->passthru("git merge -q -m 'Merge build assets from test $env_label.' -X theirs $env_id");
 
         // Push our changes back to the dev environment, replacing whatever was there before.
-        $this->passthru('git push --force -q pantheon master');
+        $this->passthru('git push --force --verbose pantheon master');
 
         // Wait for the dev environment to finish syncing after the merge.
         $this->waitForCodeSync($preCommitTime, $site, 'dev');
