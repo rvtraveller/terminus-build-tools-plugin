@@ -36,7 +36,7 @@ class GitHubProvider extends GitProvider {
   /**
    * {@inheritdoc}
    */
-  public function create($source, $target, $git_org, $git_token, $stability) {
+  public function create($source, $target, $git_org, $git_token, $stability, $site_name) {
     // We need a different URL here if $github_org is an org; if no
     // org is provided, then we use a simpler URL to create a repository
     // owned by the currently-authenitcated user.

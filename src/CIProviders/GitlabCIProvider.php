@@ -28,7 +28,12 @@ class GitlabCIProvider extends CIProvider {
    * {@inheritdoc}
    */
   public function prepare($site, $options, $terminus_token, $git_token) {
-    return [];
+    return [
+      'ADMIN_EMAIL' => $options['admin-email'],
+      'account-name' => 'mgadmin',
+      'ADMIN_PASSWORD' => $options['admin-password'],
+      'TEST_SITE_NAME' => $site->getName(),
+    ];
   }
 
   /**

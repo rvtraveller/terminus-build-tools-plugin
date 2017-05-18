@@ -29,7 +29,7 @@ class GitProvider extends Provider {
   /**
    * Create's a fork of the base repo.
    */
-  public function create($source, $target, $git_org, $git_token, $stability) {}
+  public function create($source, $target, $git_org, $git_token, $stability, $site_name) {}
 
   /**
    * Given a source, such as:
