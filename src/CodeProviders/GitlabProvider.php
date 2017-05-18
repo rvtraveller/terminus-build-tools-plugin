@@ -78,7 +78,7 @@ class GitlabProvider extends GitProvider {
     ];
 
     foreach ($variables as $key => $variable) {
-      $this->setCIVariable(urlencode($target_project), $key, $variable);
+      $this->setCIVariable(urlencode($target_project), $key, $variable, $git_token);
     }
 
     // Create a git repository. Add an origin just to have the data there
