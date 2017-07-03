@@ -1205,9 +1205,10 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         //if (!empty($remoteUrlFromGit) && ($remoteUrlFromGit != $remoteUrl)) {
         //    throw new TerminusException('Remote repository mismatch: local repository, {gitrepo} is different than the repository {metadatarepo} associated with the site {site}.', ['gitrepo' => $remoteUrlFromGit, 'metadatarepo' => $remoteUrl, 'site' => $site_id]);
         //}
-        if (empty($buildMetadata['git-provider'])) {
-            throw new TerminusException('Unable to determine git provider.');
-        }
+        //if (empty($buildMetadata['git-provider'])) {
+        //    throw new TerminusException('Unable to determine git provider.');
+        //}
+        $buildMetadata['git-provider'] = 'gitlab';
 
         $git_provider = $this->getGitProvider($buildMetadata['git-provider']);
 
@@ -1588,7 +1589,7 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         $metadataContents = file_get_contents($dest);
         $this->log()->notice('Rsync ', ['src' => $metadataContents]);
         $metadata = json_decode($metadataContents, true);
-$this->log()->notice('Rsync {src}', ['src' => $metadata]);
+        $this->log()->notice('Rsync {src}', ['src' => $metadata]);
         unlink($dest);
 
         return $metadata;
