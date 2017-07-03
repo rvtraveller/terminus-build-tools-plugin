@@ -1586,8 +1586,9 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         }
 
         $metadataContents = file_get_contents($dest);
+        var_dump($metadataContents);
         $metadata = json_decode($metadataContents, true);
-
+var_dump($metadata);
         unlink($dest);
 
         return $metadata;
