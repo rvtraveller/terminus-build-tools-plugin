@@ -1202,9 +1202,9 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         $buildMetadata = $this->retrieveBuildMetadata($site_id . ".dev");
 
         // Bail if there is a URL mismatch
-        if (!empty($remoteUrlFromGit) && ($remoteUrlFromGit != $remoteUrl)) {
-            throw new TerminusException('Remote repository mismatch: local repository, {gitrepo} is different than the repository {metadatarepo} associated with the site {site}.', ['gitrepo' => $remoteUrlFromGit, 'metadatarepo' => $remoteUrl, 'site' => $site_id]);
-        }
+        //if (!empty($remoteUrlFromGit) && ($remoteUrlFromGit != $remoteUrl)) {
+        //    throw new TerminusException('Remote repository mismatch: local repository, {gitrepo} is different than the repository {metadatarepo} associated with the site {site}.', ['gitrepo' => $remoteUrlFromGit, 'metadatarepo' => $remoteUrl, 'site' => $site_id]);
+        //}
         if (empty($buildMetadata['git-provider'])) {
             throw new TerminusException('Unable to determine git provider.');
         }
