@@ -1,0 +1,11 @@
+{
+    "package": {
+        "name": "pantheon-systems/terminus-build-tools-plugin",
+        "version": "1.0.0",
+        "source": {
+          "url": "https://github.com/rvtraveller/terminus-build-tools-plugin.git",
+          "type": "git",
+          "reference": "gitlab-mater"
+        }
+    }
+}
