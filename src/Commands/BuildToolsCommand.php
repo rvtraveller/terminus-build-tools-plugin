@@ -1586,9 +1586,9 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         }
 
         $metadataContents = file_get_contents($dest);
-        var_dump($metadataContents);
+        $this->log()->notice('Rsync ', ['src' => $metadataContents]);
         $metadata = json_decode($metadataContents, true);
-var_dump($metadata);
+$this->log()->notice('Rsync {src}', ['src' => $metadata]);
         unlink($dest);
 
         return $metadata;
