@@ -1223,8 +1223,14 @@ class BuildToolsCommand extends TerminusCommand implements SiteAwareInterface
         elseif (!empty($options['preserve-if-branch'])) {
             $environmentsWithoutPRs = $git_provider->preserveEnvsWithBranches($oldestEnvironments, $multidev_delete_pattern);
         }
-        $environmentsToKeep = array_diff($oldestEnvironments, $environmentsWithoutPRs);
-        $oldestEnvironments = $environmentsWithoutPRs;
+
+        $environmentsToKeep = [];
+        if (!empty($environmentsWithoutPRs)) {
+          $environmentsToKeep = array_diff($oldestEnvironments, $environmentsWithoutPRs);
+        }
+        if (!empty($environmentsWithoutPRs)) {
+          $oldestEnvironments = $environmentsWithoutPRs;
+        }
 
         // Separate list into 'keep' and 'oldest' lists.
         if ($options['keep']) {
