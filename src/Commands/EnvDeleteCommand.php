@@ -150,9 +150,9 @@ class EnvDeleteCommand extends BuildToolsBase
         $remoteUrl = $this->retrieveRemoteUrlFromBuildMetadata($site_id, $oldestEnvironments);
 
         // Bail if there is a URL mismatch
-        if (!empty($remoteUrlFromGit) && ($remoteUrlFromGit != $remoteUrl)) {
-            throw new TerminusException('Remote repository mismatch: local repository, {gitrepo} is different than the repository {metadatarepo} associated with the site {site}.', ['gitrepo' => $remoteUrlFromGit, 'metadatarepo' => $remoteUrl, 'site' => $site_id]);
-        }
+//        if (!empty($remoteUrlFromGit) && ($remoteUrlFromGit != $remoteUrl)) {
+//            throw new TerminusException('Remote repository mismatch: local repository, {gitrepo} is different than the repository {metadatarepo} associated with the site {site}.', ['gitrepo' => $remoteUrlFromGit, 'metadatarepo' => $remoteUrl, 'site' => $site_id]);
+//        }
 
         // Reduce result list down to just those that do NOT have open PRs.
         // We will use either the GitHub API or available git branches to check.
