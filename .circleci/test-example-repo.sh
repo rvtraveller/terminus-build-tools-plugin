@@ -53,8 +53,13 @@ else
         TARGET_REPO=$BITBUCKET_USER/$TERMINUS_SITE
         CLONE_URL="https://$BITBUCKET_USER@bitbucket.org/${TARGET_REPO}.git"
     else
-        echo "Unsupported GIT_PROVIDER. Valid values are: github, bitbucket"
-        exit 1
+        if [ "$GIT_PROVIDER" == "gitlab" ]; then
+            TARGET_REPO=$GITLAB_USER/$TERMINUS_SITE
+            CLONE_URL="https://$GITLAB_USER@gitlab.com/${TARGET_REPO}.git"
+        else
+            echo "Unsupported GIT_PROVIDER. Valid values are: github, bitbucket, gitlab"
+            exit 1
+        fi
     fi
 fi
 

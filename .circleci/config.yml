@@ -99,6 +99,21 @@ jobs:
                 when: on_fail
                 command: ./.circleci/cleanup-fixtures.sh
 
+    test_drupal_7_gitlab:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: dependencies
+                command: ./.circleci/set-up-globals.sh
+            - run:
+                name: Test D7 with GitLab
+                command: ./.circleci/test-example-repo.sh "pantheon-systems/example-drops-7-composer:dev-master" gitlab
+            - run:
+                name: D7 with GitLab Build Failed
+                when: on_fail
+                command: ./.circleci/cleanup-fixtures.sh
+
     # @todo: anything to do once everything is complete?
     # There is probably a way to check the results on the other jobs.
     completion:
