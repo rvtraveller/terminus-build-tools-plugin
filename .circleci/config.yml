@@ -142,9 +142,13 @@ workflows:
       - test_wordpress:
           requires:
             - build
+      - test_drupal_7_gitlab:
+          requires:
+            - build
       - completion:
           requires:
             - test_drupal_8_github
             - test_drupal_7_github
             - test_drupal_8_bitbucket
             - test_wordpress
+            - test_drupal_7_gitlab
