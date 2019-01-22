@@ -239,6 +239,34 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
         return $resultData;
     }
 
+    /**
+     * @inheritdoc
+     */
+    function branchesForPullRequests($target_project, $state)
+    {
+        $stateParameters = [
+            'open' => ['opened'],
+            'closed' => ['closed'],
+            'all' => ['all']
+        ];
+
+        if (!isset($stateParameters[$state]))
+            throw new TerminusException("branchesForPullRequests - state must be one of: open, closed, all");
+
+        $data = $this->gitLabAPI("projects/$target_project/merge_requests?state=" . implode('', $stateParameters[$state]));
+        var_dump($data);
+        $branchList = array_column(array_map(
+            function ($item) {
+                $pr_number = $item['number'];
+                $branch_name = $item['head']['ref'];
+                return [$pr_number, $branch_name];
+            },
+            $data
+        ), 1, 0);
+
+        return $branchList;
+    }
+
     protected function execGit($dir, $cmd, $replacements = [], $redacted = [])
     {
         return $this->execWithRedaction('git {dir}' . $cmd, ['dir' => "-C $dir "] + $replacements, ['dir' => ''] + $redacted);
