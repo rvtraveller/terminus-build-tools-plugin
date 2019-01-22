@@ -154,9 +154,9 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
             $this->execGit($local_site_path, 'init');
         }
         // TODO: maybe in the future we will not need to set this?
-        $this->execGit($local_site_path, "remote add origin 'git@" . $this->GITLAB_URL . ":{$target_project}.git'");
+        $this->execGit($local_site_path, "remote add origin " . $result['ssh_url_to_repo']);
 
-        return $target_project;
+        return $result['path_with_namespace'];
     }
 
     /**
