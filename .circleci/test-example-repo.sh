@@ -71,10 +71,12 @@ terminus build:project:create -n "$SOURCE_COMPOSER_PROJECT" "$TERMINUS_SITE" --g
 terminus site:info "$TERMINUS_SITE"
 # Confirm that the Github or Bitbucket project was created
 if [ ["$GIT_PROVIDER" == "github"] || ["$GIT_PROVIDER" == "bitbucket"] ]
+then
     git clone "$CLONE_URL" "$TARGET_REPO_WORKING_COPY"
 fi
 # Confirm that Circle was configured for testing, and that the first test passed.
 if [ "$CI_PROVIDER" == "circle" ]
+then
     (
         set +ex
         cd "$TARGET_REPO_WORKING_COPY" && circle token "$CIRCLE_TOKEN" && circle watch
