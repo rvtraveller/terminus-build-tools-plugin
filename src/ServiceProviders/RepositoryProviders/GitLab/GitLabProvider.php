@@ -217,6 +217,7 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
 
         $client = new \GuzzleHttp\Client();
         $res = $client->request($method, $url, $guzzleParams);
+        $this->logger->notice('Response: {response}', ['response' => $res->getBody()]);
         $resultData = json_decode($res->getBody(), true);
         $httpCode = $res->getStatusCode();
 
