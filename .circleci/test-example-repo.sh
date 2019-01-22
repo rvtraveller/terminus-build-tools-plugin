@@ -70,14 +70,16 @@ terminus build:project:create -n "$SOURCE_COMPOSER_PROJECT" "$TERMINUS_SITE" --g
 # Confirm that the Pantheon site was created
 terminus site:info "$TERMINUS_SITE"
 # Confirm that the Github or Bitbucket project was created
-git clone "$CLONE_URL" "$TARGET_REPO_WORKING_COPY"
+if [ ["$GIT_PROVIDER" == "github"] || ["$GIT_PROVIDER" == "bitbucket"] ]
+    git clone "$CLONE_URL" "$TARGET_REPO_WORKING_COPY"
+fi
 # Confirm that Circle was configured for testing, and that the first test passed.
-
-(
-    set +ex
-    cd "$TARGET_REPO_WORKING_COPY" && circle token "$CIRCLE_TOKEN" && circle watch
-)
-
+if [ "$CI_PROVIDER" == "circle" ]
+    (
+        set +ex
+        cd "$TARGET_REPO_WORKING_COPY" && circle token "$CIRCLE_TOKEN" && circle watch
+    )
+fi
 
 # Delete our test site, etc.
 ./.circleci/cleanup-fixtures.sh

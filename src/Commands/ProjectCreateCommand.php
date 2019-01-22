@@ -457,6 +457,7 @@ class ProjectCreateCommand extends BuildToolsBase implements PublicKeyReciever
                 ->provider($this) // TODO: replace with site provider
 
             // Tell the CI server to start testing our project
+            ->progressMessage('Beginning CI testing')
             ->taskCIStartTesting()
                 ->provider($this->ci_provider)
                 ->environment($ci_env);
