@@ -48,14 +48,17 @@ fi
 if [ "$GIT_PROVIDER" == "github" ]; then
     TARGET_REPO=$GITHUB_USER/$TERMINUS_SITE
     CLONE_URL="https://github.com/${TARGET_REPO}.git"
+    CI_PROVIDER="circle"
 else
     if [ "$GIT_PROVIDER" == "bitbucket" ]; then
         TARGET_REPO=$BITBUCKET_USER/$TERMINUS_SITE
         CLONE_URL="https://$BITBUCKET_USER@bitbucket.org/${TARGET_REPO}.git"
+        CI_PROVIDER="circle"
     else
         if [ "$GIT_PROVIDER" == "gitlab" ]; then
             TARGET_REPO=$GITLAB_USER/$TERMINUS_SITE
             CLONE_URL="https://$GITLAB_USER@gitlab.com/${TARGET_REPO}.git"
+            CI_PROVIDER="gitlabci"
         else
             echo "Unsupported GIT_PROVIDER. Valid values are: github, bitbucket, gitlab"
             exit 1
@@ -63,7 +66,7 @@ else
     fi
 fi
 
-terminus build:project:create -n "$SOURCE_COMPOSER_PROJECT" "$TERMINUS_SITE" --git=$GIT_PROVIDER --team="$TERMINUS_ORG" --email="$GIT_EMAIL" --env="BUILD_TOOLS_VERSION=$BUILD_TOOLS_VERSION"
+terminus build:project:create -n "$SOURCE_COMPOSER_PROJECT" "$TERMINUS_SITE" --git=$GIT_PROVIDER --ci=$CI_PROVIDER --team="$TERMINUS_ORG" --email="$GIT_EMAIL" --env="BUILD_TOOLS_VERSION=$BUILD_TOOLS_VERSION"
 # Confirm that the Pantheon site was created
 terminus site:info "$TERMINUS_SITE"
 # Confirm that the Github or Bitbucket project was created
