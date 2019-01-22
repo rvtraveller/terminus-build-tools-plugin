@@ -4,7 +4,7 @@
 # TODO: We should also pass the $GITHUB_TOKEN when cloning the GitHub repo so that it can be a private repo if desired.
 set -e
 
-TERMINUS_SITE=build-tools-$CIRCLE_BUILD_NUM
+TERMINUS_SITE=build-tools-$CIRCLE_PROJECT_USERNAME-$CIRCLE_BUILD_NUM
 
 # If we are on the master branch
 if [[ $CIRCLE_BRANCH == "master" ]]
@@ -70,7 +70,7 @@ terminus build:project:create -n "$SOURCE_COMPOSER_PROJECT" "$TERMINUS_SITE" --g
 # Confirm that the Pantheon site was created
 terminus site:info "$TERMINUS_SITE"
 # Confirm that the Github or Bitbucket project was created
-if [ ["$GIT_PROVIDER" == "github"] || ["$GIT_PROVIDER" == "bitbucket"] ]
+if [ "$GIT_PROVIDER" != "gitlab" ]
 then
     git clone "$CLONE_URL" "$TARGET_REPO_WORKING_COPY"
 fi
