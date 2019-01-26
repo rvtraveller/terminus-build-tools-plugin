@@ -172,7 +172,7 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
      */
     public function deleteRepository($project)
     {
-        $deleteRepoUrl = "api/v4/projects/$project";
+        $deleteRepoUrl = "api/v4/projects/" . urlencode($project);
         $this->gitLabAPI($deleteRepoUrl, [], 'DELETE');
     }
 
