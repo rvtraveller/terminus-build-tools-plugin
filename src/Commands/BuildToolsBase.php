@@ -1054,8 +1054,16 @@ class BuildToolsBase extends TerminusCommand implements SiteAwareInterface, Buil
      */
     public function getBuildMetadata($repositoryDir)
     {
+        // Protect against access tokens getting written to the build metadata file.
+        $url = exec("git -C $repositoryDir config --get remote.origin.url");
+        $parsedURL = parse_url($url);
+        // Parsed URLs over SSH don't have a scheme, user, or pass.
+        if (isset($parsedURL['scheme']) && isset($parsedURL['user']) && isset($parsedURL['pass'])) {
+            $url = str_replace($parsedURL['user'] . ':' . $parsedURL['pass'] . '@', '', $url);
+        }
+
         return [
-          'url'         => exec("git -C $repositoryDir config --get remote.origin.url"),
+          'url'         => $url,
           'ref'         => exec("git -C $repositoryDir rev-parse --abbrev-ref HEAD"),
           'sha'         => $this->getHeadCommit($repositoryDir),
           'comment'     => exec("git -C $repositoryDir log --pretty=format:%s -1"),
