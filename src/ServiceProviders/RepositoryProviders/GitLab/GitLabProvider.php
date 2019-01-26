@@ -4,7 +4,7 @@ namespace Pantheon\TerminusBuildTools\ServiceProviders\RepositoryProviders\GitLa
 
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
-
+use Pantheon\Terminus\Exceptions\TerminusException;
 use Pantheon\TerminusBuildTools\Credentials\CredentialClientInterface;
 use Pantheon\TerminusBuildTools\Credentials\CredentialProviderInterface;
 use Pantheon\TerminusBuildTools\ServiceProviders\RepositoryProviders\GitProvider;
@@ -218,6 +218,7 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
         $client = new \GuzzleHttp\Client();
         $res = $client->request($method, $url, $guzzleParams);
         $this->logger->notice('Response: {response}', ['response' => $res->getBody()]);
+        $this->logger->notice('Response headers: {headers}', ['headers' => print_r($res->getHeaders(), true)]);
         $resultData = json_decode($res->getBody(), true);
         $httpCode = $res->getStatusCode();
 
