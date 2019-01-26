@@ -232,10 +232,8 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
             $errors[] = "Http status code: $httpCode";
         }
 
-        $message = isset($resultData['message']) ? "{$resultData['message']}." : '';
-
-        if (!empty($message) || !empty($errors)) {
-            throw new TerminusException('{service} error: {message} {errors}', ['service' => $service, 'message' => $message, 'errors' => implode("\n", $errors)]);
+        if (!empty($errors)) {
+            throw new TerminusException('Error: {message} {errors}', ['errors' => implode("\n", $errors)]);
         }
 
         return $resultData;
