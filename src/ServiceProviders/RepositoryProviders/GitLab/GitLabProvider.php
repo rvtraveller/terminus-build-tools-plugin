@@ -61,7 +61,7 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
         return $url;
     }
 
-  public function tokenKey()
+    public function tokenKey()
     {
         return self::GITLAB_TOKEN;
     }
@@ -123,7 +123,7 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
      */
     public function authenticatedUser()
     {
-        $userData = $this->gitLabAPI('user');
+        $userData = $this->gitLabAPI('api/v4/user');
         return $userData['username'];
     }
 
@@ -198,7 +198,9 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
      */
     public function commentOnCommit($target_project, $commit_hash, $message)
     {
-        // @TODO -- Figure out if this is possible in GitLab API.
+        $url = "api/v4/projects/" . urlencode($target_project) . "/repository/commits/" . $commit_hash . "/comments";
+        $data = [ 'note' => $message ];
+        $this->gitLabAPI($url, $data);
     }
 
     protected function gitLabAPI($uri, $data = [], $method = 'GET')
