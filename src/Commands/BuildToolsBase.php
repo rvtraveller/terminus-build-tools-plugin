@@ -1057,7 +1057,7 @@ class BuildToolsBase extends TerminusCommand implements SiteAwareInterface, Buil
         // Protect against access tokens getting written to the build metadata file.
         $url = exec("git -C $repositoryDir config --get remote.origin.url");
         $this->inferGitProviderFromUrl($url);
-        $url = $this->git_provider->getBuildMetadataUrl();
+        $url = $this->git_provider->getBuildMetadataUrl($url);
 
         return [
           'url'         => $url,
