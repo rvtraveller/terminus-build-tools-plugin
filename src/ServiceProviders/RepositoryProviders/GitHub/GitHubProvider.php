@@ -44,7 +44,11 @@ class GitHubProvider implements GitProvider, LoggerAwareInterface, CredentialCli
         return $this->repositoryEnvironment;
     }
 
-    public function tokenKey()
+    public function getBuildMetadataUrl($url) {
+        return $url;
+    }
+
+  public function tokenKey()
     {
         return self::GITHUB_TOKEN;
     }

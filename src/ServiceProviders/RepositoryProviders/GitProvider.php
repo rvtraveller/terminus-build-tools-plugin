@@ -76,4 +76,11 @@ interface GitProvider extends ProviderInterface
      */
     public function branchesForPullRequests($target_project, $state);
 
+    /**
+     * Return the git URL of a project.
+     *
+     * @param string $url Project URL to be used for Build Metadata.
+     */
+    public function getBuildMetadataUrl($url);
+
 }
