@@ -791,7 +791,14 @@ class BuildToolsBase extends TerminusCommand implements SiteAwareInterface, Buil
 
     protected function projectFromRemoteUrl($url)
     {
-        return preg_replace('#[^:/]*[:/]([^/:]*/[^.]*)\.git#', '\1', str_replace('https://', '', $url));
+        // Vary based on if we are using HTTP URLs or SSH URLs.
+        if (strpos($url, 'https://') !== false) {
+            $parsed_url = parse_url($url);
+            return substr(str_replace('.git', '', $parsed_url), 1);
+        }
+        else {
+            return preg_replace('#[^:/]*[:/]([^/:]*/[^.]*)\.git#', '\1', str_replace('https://', '', $url));
+        }
     }
 
     protected function preserveEnvsWithOpenPRs($remoteUrl, $oldestEnvironments, $multidev_delete_pattern)
@@ -1054,13 +1061,8 @@ class BuildToolsBase extends TerminusCommand implements SiteAwareInterface, Buil
      */
     public function getBuildMetadata($repositoryDir)
     {
-        // Protect against access tokens getting written to the build metadata file.
-        $url = exec("git -C $repositoryDir config --get remote.origin.url");
-        $this->inferGitProviderFromUrl($url);
-        $url = $this->git_provider->getBuildMetadataUrl($url);
-
         return [
-          'url'         => $url,
+          'url'         => exec("git -C $repositoryDir config --get remote.origin.url"),
           'ref'         => exec("git -C $repositoryDir rev-parse --abbrev-ref HEAD"),
           'sha'         => $this->getHeadCommit($repositoryDir),
           'comment'     => exec("git -C $repositoryDir log --pretty=format:%s -1"),

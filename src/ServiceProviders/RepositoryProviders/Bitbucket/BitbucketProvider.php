@@ -51,11 +51,7 @@ class BitbucketProvider implements GitProvider, LoggerAwareInterface, Credential
         return $this->repositoryEnvironment;
     }
 
-    public function getBuildMetadataUrl($url) {
-        return $url;
-    }
-
-  public function hasToken()
+    public function hasToken()
     {
         $repositoryEnvironment = $this->getEnvironment();
         return $repositoryEnvironment->hasToken();

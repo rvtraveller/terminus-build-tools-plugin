@@ -52,15 +52,6 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
         return $this->repositoryEnvironment;
     }
 
-    public function getBuildMetadataUrl($url) {
-        $parsedURL = parse_url($url);
-        // Parsed URLs over SSH don't have a scheme, user, or pass.
-        if (isset($parsedURL['scheme']) && isset($parsedURL['user']) && isset($parsedURL['pass'])) {
-            $url = str_replace($parsedURL['user'] . ':' . $parsedURL['pass'] . '@', '', $url);
-        }
-        return $url;
-    }
-
     public function tokenKey()
     {
         return self::GITLAB_TOKEN;
@@ -123,7 +114,7 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
      */
     public function authenticatedUser()
     {
-        $userData = $this->gitLabAPI('user');
+        $userData = $this->gitLabAPI('api/v4/user');
         return $userData['username'];
     }
 

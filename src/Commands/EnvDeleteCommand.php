@@ -151,14 +151,14 @@ class EnvDeleteCommand extends BuildToolsBase
         // Find the URL of the remote origin stored in the build metadata
         $remoteUrl = $this->retrieveRemoteUrlFromBuildMetadata($site_id, $oldestEnvironments);
 
+        // Create a git repository service provider appropriate to the URL and ensure credentials are present
+        $this->inferGitProviderFromUrl($remoteUrl);
+        $this->providerManager()->validateCredentials();
+
         // Bail if there is a URL mismatch
         if (!empty($remoteUrlFromGit) && ($this->projectFromRemoteUrl($remoteUrlFromGit) != $this->projectFromRemoteUrl($remoteUrl))) {
             throw new TerminusException('Remote repository mismatch: local repository, {gitrepo} is different than the repository {metadatarepo} associated with the site {site}.', ['gitrepo' => $remoteUrlFromGit, 'metadatarepo' => $this->projectFromRemoteUrl($remoteUrl), 'site' => $site_id]);
         }
-
-        // Create a git repository service provider appropriate to the URL and ensure credentials are present
-        $this->inferGitProviderFromUrl($remoteUrl);
-        $this->providerManager()->validateCredentials();
 
         // Reduce result list down to just those that do NOT have open PRs.
         // We will use either the Git provider's API or available git branches to check.
