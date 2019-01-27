@@ -123,7 +123,7 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
      */
     public function authenticatedUser()
     {
-        $userData = $this->gitLabAPI('api/v4/user');
+        $userData = $this->gitLabAPI('user');
         return $userData['username'];
     }
 
