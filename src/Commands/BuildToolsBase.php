@@ -794,7 +794,7 @@ class BuildToolsBase extends TerminusCommand implements SiteAwareInterface, Buil
         // Vary based on if we are using HTTP URLs or SSH URLs.
         if (strpos($url, 'https://') !== false) {
             $parsed_url = parse_url($url);
-            return substr(str_replace('.git', '', $parsed_url), 1);
+            return substr(str_replace('.git', '', $parsed_url['path']), 1);
         }
         else {
             return preg_replace('#[^:/]*[:/]([^/:]*/[^.]*)\.git#', '\1', str_replace('https://', '', $url));
