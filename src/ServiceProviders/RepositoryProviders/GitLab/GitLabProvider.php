@@ -189,8 +189,21 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
      */
     public function commentOnCommit($target_project, $commit_hash, $message)
     {
-        $url = "api/v4/projects/" . urlencode($target_project) . "/repository/commits/" . $commit_hash . "/comments";
-        $data = [ 'note' => $message ];
+        // We need to check and see if a MR exists for this commit.
+        $mrs = $this->gitLabAPI("api/v4/projects/" . urlencode($target_project) . "/merge_requests?state=opened");
+        $url = null;
+        $data = [];
+        foreach ($mrs as $mr) {
+            if ($mr['sha'] == $commit_hash) {
+                $url = "api/v4/projects/" . urlencode($target_project) . "/merge_requests/" . $mr['iid'] . "/notes";
+                $data = [ 'body' => $message ];
+                break;
+            }
+        }
+        if (is_null($url)) {
+            $url = "api/v4/projects/" . urlencode($target_project) . "/repository/commits/" . $commit_hash . "/comments";
+            $data = [ 'note' => $message ];
+        }
         $this->gitLabAPI($url, $data);
     }
 
