@@ -205,6 +205,7 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
             $url = "api/v4/projects/" . urlencode($target_project) . "/repository/commits/" . $commit_hash . "/comments";
             $data = [ 'note' => $message ];
         }
+
         $this->gitLabAPI($url, $data);
     }
 
