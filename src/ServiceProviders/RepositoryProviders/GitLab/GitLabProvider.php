@@ -2,6 +2,7 @@
 
 namespace Pantheon\TerminusBuildTools\ServiceProviders\RepositoryProviders\GitLab;
 
+use Pantheon\TerminusBuildTools\ServiceProviders\ProviderEnvironment;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use Pantheon\Terminus\Exceptions\TerminusException;
@@ -213,7 +214,7 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
 
         $headers = [
             'Content-Type' => 'application/json',
-            'User-Agent' => 'pantheon/terminus-build-tools-plugin'
+            'User-Agent' => ProviderEnvironment::USER_AGENT,
         ];
 
         if ($this->hasToken()) {
@@ -232,8 +233,6 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
 
         $client = new \GuzzleHttp\Client();
         $res = $client->request($method, $url, $guzzleParams);
-        $this->logger->notice('Response: {response}', ['response' => $res->getBody()]);
-        $this->logger->notice('Response headers: {headers}', ['headers' => print_r($res->getHeaders(), true)]);
         $resultData = json_decode($res->getBody(), true);
         $httpCode = $res->getStatusCode();
 
