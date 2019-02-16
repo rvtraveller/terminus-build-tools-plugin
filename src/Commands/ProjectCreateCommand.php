@@ -371,6 +371,16 @@ class ProjectCreateCommand extends BuildToolsBase implements PublicKeyReciever
             // It is not necessary to push to GitHub so soon, but it's helpful
             // for debugging et. al. to have the initial repo contents available.
 
+            ->progressMessage('Set up CI services')
+
+            // Set up CircleCI to test our project.
+            // Note that this also modifies the README and commits it to the repository.
+            ->taskCISetup()
+            ->provider($this->ci_provider)
+            ->environment($ci_env)
+            ->deferTaskConfiguration('hasMultidevCapability', 'has-multidev-capability')
+            ->dir($siteDir)
+
             ->progressMessage('Push initial code to {target}', ['target' => $target_label])
             /*
             ->taskRepositoryPush()
@@ -384,16 +394,6 @@ class ProjectCreateCommand extends BuildToolsBase implements PublicKeyReciever
 
                     $this->git_provider->pushRepository($siteDir, $repositoryAttributes->projectId());
                 })
-
-            ->progressMessage('Set up CI services')
-
-            // Set up CircleCI to test our project.
-            // Note that this also modifies the README and commits it to the repository.
-            ->taskCISetup()
-                ->provider($this->ci_provider)
-                ->environment($ci_env)
-                ->deferTaskConfiguration('hasMultidevCapability', 'has-multidev-capability')
-                ->dir($siteDir)
 
             // Push code to newly-created project.
             // Note that this also effectively does a 'git reset --hard'
