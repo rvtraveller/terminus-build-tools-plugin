@@ -165,6 +165,7 @@ class GitLabProvider implements GitProvider, LoggerAwareInterface, CredentialCli
      */
     public function pushRepository($dir, $target_project)
     {
+        $this->execGit($dir, 'gc --prune=now --force');
         $this->execGit($dir, 'push --progress https://oauth2:{token}@{gitlab_url}/{target}.git master', ['token' => $this->token(), 'gitlab_url' => $this->GITLAB_URL, 'target' => $target_project], ['token']);
     }
 
